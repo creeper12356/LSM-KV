@@ -19,7 +19,7 @@ namespace utils
     /**
      * Check whether directory exists
      * @param path directory to be checked.
-     * @return ture if directory exists, false otherwise.
+     * @return true if directory exists, false otherwise.
      */
     static inline bool dirExists(const std::string &path)
     {
@@ -203,7 +203,7 @@ namespace utils
     }
 
     /**
-     * 随机函数
+     * @brief 随机函数
      * @return 0-1之间的随机数
      */
     static inline double random() {

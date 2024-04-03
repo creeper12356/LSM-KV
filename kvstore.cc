@@ -1,15 +1,30 @@
 #include "kvstore.h"
-#include "skiplist.h"
-#include <string>
+#include "skip_list.h"
+#include "bloom_filter.h"
+#include "ss_table.h"
+#include "v_log.h"
+#include "utils.h"
 
-KVStore::KVStore(const std::string &dir, const std::string &vlog) : KVStoreAPI(dir, vlog)
+#include <iostream>
+#include <string>
+#include <sstream>
+
+#define MEM_TABLE_CAPACITY 411
+
+KVStore::KVStore(const std::string &dir, const std::string &vlog)
+: KVStoreAPI(dir, vlog)
+, dir_(dir)
+, ss_table_count_(0)
 {
-	m_skiplist = new skiplist::Skiplist;
+    std::cout << "dir = " <<  dir_ << std::endl;
+    mem_table_ = new skip_list::SkipList;
+    v_log_ = new v_log::VLog(vlog);
 }
 
 KVStore::~KVStore()
 {
-	delete m_skiplist;
+	delete mem_table_;
+    delete v_log_;
 }
 
 /**
@@ -18,7 +33,16 @@ KVStore::~KVStore()
  */
 void KVStore::put(uint64_t key, const std::string &s)
 {
-	m_skiplist->put(key, s);
+    mem_table_->Put(key, s);
+    if(mem_table_->size() == MEM_TABLE_CAPACITY) {
+        // 写入SSTable
+        utils::mkdir(dir_ + "/level-0");
+        ss_table::SSTable ss_table(++ ss_table_count_, *mem_table_);
+        std::stringstream stream;
+        stream << dir_ << "/level-0/" << ss_table_count_ << ".sst";
+        ss_table.WriteToFile(stream.str());
+        mem_table_->Reset();
+    }
 }
 /**
  * Returns the (string) value of the given key.
@@ -26,7 +50,7 @@ void KVStore::put(uint64_t key, const std::string &s)
  */
 std::string KVStore::get(uint64_t key)
 {
-	return m_skiplist->get(key);
+	return mem_table_->Get(key);
 }
 /**
  * Delete the given key-value pair if it exists.
@@ -34,7 +58,7 @@ std::string KVStore::get(uint64_t key)
  */
 bool KVStore::del(uint64_t key)
 {
-	return m_skiplist->del(key);
+	return mem_table_->Del(key);
 }
 
 /**
@@ -43,7 +67,7 @@ bool KVStore::del(uint64_t key)
  */
 void KVStore::reset()
 {
-	m_skiplist->reset();
+    mem_table_->Reset();
 }
 
 /**
@@ -53,7 +77,7 @@ void KVStore::reset()
  */
 void KVStore::scan(uint64_t key1, uint64_t key2, std::list<std::pair<uint64_t, std::string>> &list)
 {
-	m_skiplist->scan(key1, key2, list);
+    mem_table_->Scan(key1, key2, list);
 }
 
 /**

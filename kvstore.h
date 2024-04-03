@@ -2,8 +2,11 @@
 
 #include "kvstore_api.h"
 
-namespace skiplist {
-	class Skiplist;
+namespace skip_list {
+	class SkipList;
+}
+namespace v_log {
+    class VLog;
 }
 class KVStore : public KVStoreAPI
 {
@@ -24,6 +27,11 @@ public:
 	void scan(uint64_t key1, uint64_t key2, std::list<std::pair<uint64_t, std::string>> &list) override;
 
 	void gc(uint64_t chunk_size) override;
+
 private:
-	skiplist::Skiplist* m_skiplist;
+    std::string dir_;
+	skip_list::SkipList* mem_table_;
+    uint64_t ss_table_count_;
+    v_log::VLog *v_log_;
+
 };

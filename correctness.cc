@@ -39,7 +39,7 @@ private:
 			EXPECT(std::string(i + 1, 's'), store.get(i));
 		phase();
 
-		// Test scan
+		// Test Scan
 		std::list<std::pair<uint64_t, std::string>> list_ans;
 		std::list<std::pair<uint64_t, std::string>> list_stu;
 

@@ -8,8 +8,8 @@ class KVStoreAPI
 {
 public:
 	/**
-	 * You should put all sstables under `dir`, and all value pairs in `vlog`.
-	 * Please create one sub-directory for each level, and put sstables
+	 * You should Put all sstables under `dir`, and all value pairs in `vlog`.
+	 * Please create one sub-directory for each level, and Put sstables
 	 * there. Please refer to the c++ filesystem library
 	 * (https://en.cppreference.com/w/cpp/filesystem).
 	 */
