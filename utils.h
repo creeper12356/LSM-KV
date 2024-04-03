@@ -1,4 +1,5 @@
-#pragma once
+#ifndef LSMKV_HANDOUT_UTILS_H
+#define LSMKV_HANDOUT_UTILS_H
 
 #include <sstream>
 #include <sys/stat.h>
@@ -9,6 +10,7 @@
 #include <fcntl.h>
 #include <cstring>
 #include <memory>
+#include <cstdlib>
 
 #define PAGE_SIZE (4 * 1024)
 
@@ -199,4 +201,17 @@ namespace utils
         }
         return crc;
     }
+
+    /**
+     * 随机函数
+     * @return 0-1之间的随机数
+     */
+    static inline double random() {
+        double res = ((double) rand() / (RAND_MAX));
+        return res;
+    }
+
 }
+
+
+#endif // LSMKV_HANDOUT_UTILS_H
