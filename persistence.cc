@@ -24,7 +24,7 @@ public:
 		// Clean up
 		store.reset();
 
-		// Test multiple key-value pairs
+		// Test multiple key_-value pairs
 		for (i = 0; i < TEST_MAX; ++i)
 		{
 			store.put(i, std::string(i + 1, 's'));

@@ -10,16 +10,21 @@
 #include <string>
 #include <cstdlib>
 #include <list>
-namespace bloom_filter {
-    class BloomFilter;
-}
+#include <cassert>
+
 namespace ss_table {
     struct Header;
+    struct KeyOffsetVlenTuple;
+}
+namespace v_log {
+    class VLog;
 }
 namespace skip_list {
     class SkipList
     {
+    public:
         class Node;
+        class Iterator;
     public:
         explicit SkipList(double p = 0.5);
         ~SkipList();
@@ -31,11 +36,17 @@ namespace skip_list {
         void Reset();
 
         /**
-         * @brief 将所有键插入Bloom过滤器
-         * @param bloom_filter
-         * @param ss_table_header 返回的SSTable的元数据
+         * 底层链表头节点指针
+         * @return
          */
-        void InsertAllKeys(bloom_filter::BloomFilter* bloom_filter, ss_table::Header* ss_table_header) const;
+        Node *header() const;
+        Iterator begin() const {
+            return Iterator(headers_[0]->succ_);
+        }
+        Iterator end() const {
+            return Iterator(nullptr);
+        }
+
 
         int size() const;
 
@@ -58,23 +69,62 @@ namespace skip_list {
         void Clear();
 
 
-    private:
+    public:
         class Node {
+            friend class SkipList;
         public:
-            uint64_t key;
-            std::string* val_ptr;
-            Node* prev;
-            Node* succ;
-            Node* above;
-            Node* below;
-            bool is_header; // 是否为链表头节点
-            bool is_owner; // val_ptr的动态内存是否归属于该节点
-
             Node() ;
             explicit Node(const uint64_t& key, const std::string& val, Node* prev= nullptr, Node* succ= nullptr, Node* above= nullptr, Node* below= nullptr);
             Node(const uint64_t& key, std::string* val_ptr, Node* prev= nullptr, Node* succ= nullptr, Node* above= nullptr, Node* below= nullptr);
             ~Node();
-            std::string& val() const {return *val_ptr;}
+            uint64_t key() const { return key_; }
+            std::string& val() const {return *val_ptr_;}
+            Node *prev() const { return prev_; }
+            Node *succ() const { return succ_; }
+            Node *above() const { return above_; }
+            Node *below() const { return below_; }
+            bool is_header() const { return is_header_; }
+            bool is_owner() const { return is_owner_; }
+
+        private:
+            uint64_t key_;
+            std::string* val_ptr_;
+            Node* prev_;
+            Node* succ_;
+            Node* above_;
+            Node* below_;
+            bool is_header_; // 是否为链表头节点
+            bool is_owner_; // val_ptr的动态内存是否归属于该节点
+        };
+        class Iterator {
+        public:
+            explicit Iterator(Node *cur_node): cur_node_(cur_node) {}
+            Iterator& operator++() {
+                assert(cur_node_);
+                cur_node_ = cur_node_->succ_;
+                return *this;
+            }
+            Iterator Previous() const {
+                assert(cur_node_);
+                return Iterator(cur_node_->prev_);
+            }
+            Iterator Next() const {
+                assert(cur_node_);
+                return Iterator(cur_node_->succ_);
+            }
+            Node &operator*() const {
+                assert(cur_node_);
+                return *cur_node_;
+            }
+            bool operator==(const Iterator& other) {
+                return cur_node_ == other.cur_node_;
+            }
+            bool operator!=(const Iterator& other) {
+                return cur_node_ != other.cur_node_;
+            }
+
+        private:
+            Node *cur_node_;
         };
 
     private:

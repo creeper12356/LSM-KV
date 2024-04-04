@@ -17,31 +17,31 @@ public:
 	KVStoreAPI() = delete;
 
 	/**
-	 * Insert/Update the key-value pair.
+	 * Insert/Update the key_-value pair.
 	 * No return values for simplicity.
 	 */
 	virtual void put(uint64_t key, const std::string &s) = 0;
 
 	/**
-	 * Returns the (string) value of the given key.
+	 * Returns the (string) value of the given key_.
 	 * An empty string indicates not found.
 	 */
 	virtual std::string get(uint64_t key) = 0;
 
 	/**
-	 * Delete the given key-value pair if it exists.
-	 * Returns false iff the key is not found.
+	 * Delete the given key_-value pair if it exists.
+	 * Returns false iff the key_ is not found.
 	 */
 	virtual bool del(uint64_t key) = 0;
 
 	/**
-	 * This resets the kvstore. All key-value pairs should be removed,
+	 * This resets the kvstore. All key_-value pairs should be removed,
 	 * including memtable and all sstables files.
 	 */
 	virtual void reset() = 0;
 
 	/**
-	 * Return a list including all the key-value pair between key1 and key2.
+	 * Return a list including all the key_-value pair between key1 and key2.
 	 * keys in the list should be in an ascending order.
 	 * An empty string indicates not found.
 	 */

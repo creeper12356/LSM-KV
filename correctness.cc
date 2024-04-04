@@ -16,7 +16,7 @@ private:
 	{
 		uint64_t i;
 
-		// Test a single key
+		// Test a single key_
 		EXPECT(not_found, store.get(1));
 		store.put(1, "SE");
 		EXPECT("SE", store.get(1));
@@ -26,7 +26,7 @@ private:
 
 		phase();
 
-		// Test multiple key-value pairs
+		// Test multiple key_-value pairs
 		for (i = 0; i < max; ++i)
 		{
 			store.put(i, std::string(i + 1, 's'));

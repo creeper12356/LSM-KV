@@ -2,8 +2,8 @@
 // Created by creeper on 24-3-31.
 //
 #include "skip_list.h"
-#include "bloom_filter.h"
 #include "ss_table.h"
+#include "v_log.h"
 #include "utils.h"
 #include <cassert>
 
@@ -20,20 +20,20 @@ namespace skip_list {
 
         Node* cur_node = headers_.back();
         while(true) {
-            if (cur_node->is_header || cur_node->key < key) {
-                if (!cur_node->succ || cur_node->succ->key > key) {
-                    if (cur_node->below) {
+            if (cur_node->is_header_ || cur_node->key_ < key) {
+                if (!cur_node->succ_ || cur_node->succ_->key_ > key) {
+                    if (cur_node->below_) {
                         //go down
-                        cur_node = cur_node->below;
+                        cur_node = cur_node->below_;
                     } else {
                         // cur_node位于最底层
                         //新结点插入双链表
-                        auto new_node = new Node(key, val, cur_node, cur_node->succ);
-                        cur_node->succ = new_node;
-                        if (new_node->succ) {
-                            new_node->succ->prev = new_node;
+                        auto new_node = new Node(key, val, cur_node, cur_node->succ_);
+                        cur_node->succ_ = new_node;
+                        if (new_node->succ_) {
+                            new_node->succ_->prev_ = new_node;
                         }
-                        auto val_ptr = new_node->val_ptr;
+                        auto val_ptr = new_node->val_ptr_;
 
 
                         cur_node = new_node;
@@ -41,8 +41,8 @@ namespace skip_list {
                         int new_level = 1;
                         while (utils::random() < probability_) {
                             // val_ptr浅拷贝
-                            cur_node->above = new Node(key, val_ptr, nullptr, nullptr, nullptr, cur_node);
-                            cur_node = cur_node->above;
+                            cur_node->above_ = new Node(key, val_ptr, nullptr, nullptr, nullptr, cur_node);
+                            cur_node = cur_node->above_;
                             ++new_level;
                         }
                         //更新跳表高度
@@ -51,8 +51,8 @@ namespace skip_list {
                             while (count != 0) {
                                 // m_headers剩余位置补齐头节点
                                 auto new_header_node = new Node;
-                                new_header_node->below = headers_.back();
-                                headers_.back()->above = new_header_node;
+                                new_header_node->below_ = headers_.back();
+                                headers_.back()->above_ = new_header_node;
 
                                 headers_.push_back(new_header_node);
                                 --count;
@@ -61,42 +61,42 @@ namespace skip_list {
 
                         //逐层水平连接
                         //fix : bug
-                        new_node = new_node->above;
+                        new_node = new_node->above_;
                         for (int i = 1; i < new_level; ++i) {
                             cur_node = headers_[i];
                             while (true) {
-                                if (cur_node->is_header || cur_node->key < key) {
-                                    if (!cur_node->succ || cur_node->succ->key > key) {
+                                if (cur_node->is_header_ || cur_node->key_ < key) {
+                                    if (!cur_node->succ_ || cur_node->succ_->key_ > key) {
                                         //新结点插入双链表
-                                        new_node->prev = cur_node;
-                                        new_node->succ = cur_node->succ;
-                                        cur_node->succ = new_node;
-                                        if (new_node->succ) {
-                                            new_node->succ->prev = new_node;
+                                        new_node->prev_ = cur_node;
+                                        new_node->succ_ = cur_node->succ_;
+                                        cur_node->succ_ = new_node;
+                                        if (new_node->succ_) {
+                                            new_node->succ_->prev_ = new_node;
                                         }
                                         break;
                                     }
                                 }
-                                cur_node = cur_node->succ;
+                                cur_node = cur_node->succ_;
                             }
                             //update new_node
-                            new_node = new_node->above;
+                            new_node = new_node->above_;
                         }
                         ++ size_;
                         return;
                     }
                 } else {
-                    cur_node = cur_node->succ;
+                    cur_node = cur_node->succ_;
                 }
-            } else if (cur_node->key == key) {
+            } else if (cur_node->key_ == key) {
                 // 查找成功，直接覆盖
-                while (cur_node->below) {
-                    cur_node = cur_node->below;
+                while (cur_node->below_) {
+                    cur_node = cur_node->below_;
                 }
                 cur_node->val() = val;
                 return;
             } else {
-                //cur_node->key > key
+                //cur_node->key_ > key_
                 // control never reaches here.
                 assert(false);
             }
@@ -110,20 +110,20 @@ namespace skip_list {
         }
 
         // 移动到最底层
-        while(res_node->below) {
-            res_node = res_node->below;
+        while(res_node->below_) {
+            res_node = res_node->below_;
         }
         // 向上逐层删除结点
         Node *deleted_node;
         while(res_node) {
-            if(res_node->prev) {
-                res_node->prev->succ = res_node->succ;
+            if(res_node->prev_) {
+                res_node->prev_->succ_ = res_node->succ_;
             }
-            if(res_node->succ) {
-                res_node->succ->prev = res_node->prev;
+            if(res_node->succ_) {
+                res_node->succ_->prev_ = res_node->prev_;
             }
             deleted_node = res_node;
-            res_node = res_node->above;
+            res_node = res_node->above_;
             delete deleted_node;
         }
         -- size_;
@@ -139,18 +139,18 @@ namespace skip_list {
         Node *node1 = GetNode(key1, &is_found);
         if(is_found) {
             // 移动到最底层
-            while(node1->below) {
-                node1 = node1->below;
+            while(node1->below_) {
+                node1 = node1->below_;
             }
         }
         else {
-            node1 = node1->succ;
+            node1 = node1->succ_;
         }
         // 扫描链表，将键值对加入返回列表中
         Node *cur_node = node1;
-        while(cur_node && cur_node->key <= key2) {
-            list.emplace_back(cur_node->key, cur_node->val());
-            cur_node = cur_node->succ;
+        while(cur_node && cur_node->key_ <= key2) {
+            list.emplace_back(cur_node->key_, cur_node->val());
+            cur_node = cur_node->succ_;
         }
     }
     
@@ -166,22 +166,22 @@ namespace skip_list {
 
         Node* cur_node = headers_.back();
         while(true) {
-            if(cur_node->is_header || cur_node->key < key) {
-                if(!cur_node->succ || cur_node->succ->key > key) {
-                    if(!cur_node->below) {
+            if(cur_node->is_header_ || cur_node->key_ < key) {
+                if(!cur_node->succ_ || cur_node->succ_->key_ > key) {
+                    if(!cur_node->below_) {
                         // 已经到达最底层，查找失败
                         is_found && (*is_found = false);
                         break;
                     }
                     else {
-                        cur_node = cur_node->below;
+                        cur_node = cur_node->below_;
                     }
                 }
                 else {
-                    cur_node = cur_node->succ;
+                    cur_node = cur_node->succ_;
                 }
             }
-            else if(cur_node->key == key) {
+            else if(cur_node->key_ == key) {
                 // 查找成功
                 is_found && (*is_found = true);
                 break;
@@ -196,7 +196,7 @@ namespace skip_list {
             Node* cur = header;
             Node* succ;
             while(cur) {
-                succ = cur->succ;
+                succ = cur->succ_;
                 delete cur;
                 cur = succ;
             }
@@ -221,28 +221,9 @@ namespace skip_list {
         return size_;
     }
 
-    void SkipList::InsertAllKeys(bloom_filter::BloomFilter *bloom_filter, ss_table::Header* ss_table_header) const {
+    SkipList::Node *SkipList::header() const {
         assert(!headers_.empty());
-        ss_table_header->key_count = 0;
-        Node *cur_node = headers_[0]->succ;
-        if(!cur_node) {
-            // 跳表为空
-            return ;
-        }
-
-        ss_table_header->min_key = cur_node->key;
-
-        // 遍历除最后一个的所有结点
-        while(cur_node->succ) {
-            bloom_filter->Insert(cur_node->key);
-            cur_node = cur_node->succ;
-            ++ ss_table_header->key_count;
-        }
-
-        // 处理最后一个结点
-        ss_table_header->max_key = cur_node->key;
-        bloom_filter->Insert(cur_node->key);
-        ++ ss_table_header->key_count;
+        return headers_[0];
     }
 
 
@@ -252,14 +233,14 @@ namespace skip_list {
                          SkipList::Node *arg_succ,
                          SkipList::Node *arg_above,
                          SkipList::Node *arg_below)
-            : key(arg_key),
-              val_ptr(new std::string(arg_val)),
-              prev(arg_prev),
-              succ(arg_succ),
-              above(arg_above),
-              below(arg_below),
-              is_header(false),
-              is_owner(true) { }
+            : key_(arg_key),
+              val_ptr_(new std::string(arg_val)),
+              prev_(arg_prev),
+              succ_(arg_succ),
+              above_(arg_above),
+              below_(arg_below),
+              is_header_(false),
+              is_owner_(true) { }
 
     SkipList::Node::Node(const uint64_t &arg_key,
                          std::string *arg_val_ptr,
@@ -267,28 +248,28 @@ namespace skip_list {
                          SkipList::Node *arg_succ,
                          SkipList::Node *arg_above,
                          SkipList::Node *arg_below)
-            : key(arg_key),
-              val_ptr(arg_val_ptr),
-              prev(arg_prev),
-              succ(arg_succ),
-              above(arg_above),
-              below(arg_below) ,
-              is_header(false),
-              is_owner(false) { }
+            : key_(arg_key),
+              val_ptr_(arg_val_ptr),
+              prev_(arg_prev),
+              succ_(arg_succ),
+              above_(arg_above),
+              below_(arg_below) ,
+              is_header_(false),
+              is_owner_(false) { }
 
     SkipList::Node::Node() :
-            key(0),
-            val_ptr(nullptr),
-            prev(nullptr),
-            succ(nullptr),
-            above(nullptr),
-            below(nullptr),
-            is_header(true),
-            is_owner(false) { }
+            key_(0),
+            val_ptr_(nullptr),
+            prev_(nullptr),
+            succ_(nullptr),
+            above_(nullptr),
+            below_(nullptr),
+            is_header_(true),
+            is_owner_(false) { }
 
     SkipList::Node::~Node() {
-        if(is_owner) {
-            delete val_ptr;
+        if(is_owner_) {
+            delete val_ptr_;
         }
     }
 

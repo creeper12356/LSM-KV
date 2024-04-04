@@ -12,7 +12,13 @@ namespace v_log {
     class VLog {
     public:
         VLog(const std::string &v_log_file_name);
-        void Insert(uint64_t key, const std::string &val);
+        /**
+         * 向VLog文件中插入键值对
+         * @param key
+         * @param val
+         * @return 插入的值在文件中的偏移量
+         */
+        uint64_t Insert(uint64_t key, const std::string &val);
     private:
         std::string file_name_;
 

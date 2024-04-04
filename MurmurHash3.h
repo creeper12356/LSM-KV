@@ -52,13 +52,13 @@ FORCE_INLINE uint64_t fmix64 ( uint64_t k )
 /**
 * Murmur hash function
 * @param key hash target.
-* @param len byte number of key.
+* @param len byte number of key_.
 * @param seed use 1.
 * @param out 128bit, use as 4 unsigned int.
 * Example
-  long long key = 103122;
+  long long key_ = 103122;
   unsigned int hash[4] = {0};
-  MurmurHash3_x64_128(&key, sizeof(key), 1, hash);
+  MurmurHash3_x64_128(&key_, sizeof(key_), 1, hash);
 */
 static inline void MurmurHash3_x64_128 ( const void * key, const int len,
                            const uint32_t seed, void * out )

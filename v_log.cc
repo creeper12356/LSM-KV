@@ -5,6 +5,7 @@
 #include "utils.h"
 #include <fstream>
 #include <vector>
+#include <iostream>
 
 v_log::VLog::VLog(const std::string &v_log_file_name): file_name_(v_log_file_name) {
     // 创建新的vlog文件
@@ -13,8 +14,9 @@ v_log::VLog::VLog(const std::string &v_log_file_name): file_name_(v_log_file_nam
     fout.close();
 }
 
-void v_log::VLog::Insert(uint64_t key, const std::string &val) {
+uint64_t v_log::VLog::Insert(uint64_t key, const std::string &val) {
     std::ofstream fout;
+
     fout.open(file_name_, std::ios::app | std::ios::binary);
 
     fout.write(&kMagic, 1);
@@ -31,8 +33,14 @@ void v_log::VLog::Insert(uint64_t key, const std::string &val) {
     uint16_t check_sum = utils::crc16(data);
 
     fout.write(reinterpret_cast<const char*>(&check_sum), 2);
-    // 写入拼接结果
-    fout.write(data_str.c_str(), data_str.size());
+
+    // 写入key-vlen-value拼接结果
+    fout.write(reinterpret_cast<const char*> (&key), sizeof (uint64_t));
+    fout.write(reinterpret_cast<const char*> (&vlen), sizeof (uint32_t));
+    uint64_t offset;
+    offset = fout.tellp();
+    fout.write(val.c_str(), val.size());
 
     fout.close();
+    return offset;
 }
