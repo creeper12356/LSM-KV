@@ -6,27 +6,25 @@
 #include "bloom_filter.h"
 #include "MurmurHash3.h"
 namespace bloom_filter {
-    BloomFilter::BloomFilter(int vector_size, int hash_count)
-            : vector_size_(vector_size),
-              hash_count_(hash_count) {
+    BloomFilter::BloomFilter(int vector_size)
+            : vector_size_(vector_size) {
         hash_vector_ = new bool[vector_size];
     }
 
-    int BloomFilter::Hash(uint64_t key, int hash_index) {
-        uint64_t hash[2] = {};
-        MurmurHash3_x64_128(&key, sizeof(key), hash_index, hash);
-        return hash[1] % vector_size_ ;
-    }
 
     void BloomFilter::Insert(uint64_t key) {
-        for(int i = 1;i <= hash_count_; ++i) {
-            hash_vector_[Hash(key, i)] = true;
+        uint32_t hash[4] = {};
+        MurmurHash3_x64_128(&key, sizeof(key), 1, hash);
+        for(uint32_t res : hash) {
+            hash_vector_[res % vector_size_] = true;
         }
     }
 
     bool BloomFilter::Search(uint64_t key) {
-        for(int i = 1;i <= hash_count_; ++i) {
-            if(!hash_vector_[Hash(key, i)]) {
+        uint32_t hash[4] = {};
+        MurmurHash3_x64_128(&key, sizeof(key), 1, hash);
+        for(uint32_t res: hash) {
+            if(!hash_vector_[res % vector_size_]) {
                 return false;
             }
         }

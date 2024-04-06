@@ -9,17 +9,10 @@
 namespace bloom_filter {
     class BloomFilter {
     public:
-        BloomFilter(int vector_size, int hash_count);
+        explicit BloomFilter(int vector_size);
         ~BloomFilter();
     public:
 
-        /**
-         * Bloom 过滤器使用的Hash函数
-         * @param key 查找和插入的键
-         * @param hash_index Hash函数序号，从1-hash_count_
-         * @return Hash后的值，从0-vector_size - 1
-         */
-        int Hash(uint64_t key, int hash_index);
         /**
          * 插入键
          * @param key
@@ -40,7 +33,6 @@ namespace bloom_filter {
 
     private:
         int vector_size_;
-        int hash_count_;
         bool* hash_vector_;
 
     };

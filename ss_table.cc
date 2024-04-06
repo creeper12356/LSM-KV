@@ -12,7 +12,7 @@
 namespace ss_table {
 
     SSTable::SSTable(uint64_t time_stamp, const skip_list::SkipList& mem_table) {
-        bloom_filter_ = new bloom_filter::BloomFilter(BLOOM_FILTER_VECTOR_SIZE, 4);
+        bloom_filter_ = new bloom_filter::BloomFilter(BLOOM_FILTER_VECTOR_SIZE);
         header_.time_stamp = time_stamp;
     }
 
