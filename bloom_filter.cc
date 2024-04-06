@@ -38,7 +38,22 @@ namespace bloom_filter {
     }
 
     void BloomFilter::WriteToFile(std::ofstream& fout) {
-        fout.write((char*)(hash_vector_), vector_size_);
+        // 将0-1字符串转换为比特流
+        bool* cur = hash_vector_;
+        int count = 0;
+        unsigned char byte = 0;
+        while(count < vector_size_) {
+            if(*cur) {
+                byte = byte & (1 << count);
+            }
+            if(count % 8 == 7) {
+                // 一个字节中的最后一个bit
+                fout.write(reinterpret_cast<const char*>(&byte), 1);
+                byte = 0;
+            }
+            ++count;
+            ++cur;
+        }
     }
 
 }

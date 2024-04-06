@@ -4,12 +4,12 @@
 #include "ss_table.h"
 #include "v_log.h"
 #include "utils.h"
+#include "inc.h"
 
 #include <iostream>
 #include <string>
 #include <sstream>
 
-#define MEM_TABLE_CAPACITY 411
 
 KVStore::KVStore(const std::string &dir, const std::string &vlog)
 : KVStoreAPI(dir, vlog)
