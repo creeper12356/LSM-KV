@@ -39,8 +39,23 @@ uint64_t v_log::VLog::Insert(uint64_t key, const std::string &val) {
     fout.write(reinterpret_cast<const char*> (&vlen), sizeof (uint32_t));
     uint64_t offset;
     offset = fout.tellp();
+    offset = fout.tellp();
     fout.write(val.c_str(), val.size());
 
     fout.close();
     return offset;
+}
+
+std::string v_log::VLog::Get(uint64_t offset, uint32_t vlen) {
+    std::ifstream fin;
+    fin.open(file_name_, std::ios::binary);
+    fin.seekg(offset);
+    std::string val = "";
+    char* val_c_str = new char[vlen + 1];
+    val_c_str[vlen] = '\0';
+    fin.read(val_c_str, vlen);
+    val = val_c_str;
+
+    delete [] val_c_str;
+    return val;
 }

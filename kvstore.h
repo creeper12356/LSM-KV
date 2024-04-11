@@ -27,7 +27,12 @@ public:
 	void scan(uint64_t key1, uint64_t key2, std::list<std::pair<uint64_t, std::string>> &list) override;
 
 	void gc(uint64_t chunk_size) override;
+private:
 
+    /**
+     * @brief 将内存表（跳表）写入SSTable文件
+     */
+    void ConvertMemTableToSSTable();
 private:
     std::string dir_;
 	skip_list::SkipList* mem_table_;

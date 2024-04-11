@@ -24,12 +24,19 @@ namespace bloom_filter {
          * @return
          */
         bool Search(uint64_t key);
-
+        /**
+         * @brief 从文件中读取Bloom过滤器
+         * @param fin 文件输入流
+         */
+        void ReadFromFile(std::ifstream &fin);
         /**
          * 将Bloom 过滤器的向量写入文件
          * @param fout 文件输出流
          */
         void WriteToFile(std::ofstream &fout);
+
+    public:
+        bool operator==(const BloomFilter& other) const;
 
     private:
         int vector_size_;

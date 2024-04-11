@@ -20,10 +20,30 @@ namespace ss_table {
         delete bloom_filter_;
     }
 
+    bool SSTable::ReadFromFile(const std::string &file_name) {
+        std::ifstream fin;
+        fin.open(file_name);
+        if(!fin) {
+            return false;
+        }
+        fin.read(reinterpret_cast<char*>(&header_), sizeof(Header));
+        bloom_filter_ = new bloom_filter::BloomFilter(BLOOM_FILTER_VECTOR_SIZE);
+
+        bloom_filter_->ReadFromFile(fin);
+
+        for(int i = 0;i < header_.key_count; ++i) {
+            KeyOffsetVlenTuple tuple = {};
+            fin.read(reinterpret_cast<char*>(&tuple), 20);
+            key_offset_vlen_tuple_list_.push_back(tuple);
+        }
+
+        fin.close();
+        return true;
+    }
     void SSTable::WriteToFile(const std::string &file_name) const {
         std::ofstream fout;
         fout.open(file_name , std::ios::out | std::ios::binary);
-        fout.write((char*) &header_, sizeof(Header));
+        fout.write(reinterpret_cast<const char*> (&header_), sizeof(Header));
 
         bloom_filter_->WriteToFile(fout);
 
@@ -41,12 +61,42 @@ namespace ss_table {
         header_.max_key = max_key;
     }
 
-    void SSTable::InsertKeyOffsetVlenTuple(uint64_t key, uint64_t offset, uint32_t v_len) {
-        key_offset_vlen_tuple_list_.push_back({key, offset, v_len});
+    void SSTable::InsertKeyOffsetVlenTuple(uint64_t key, uint64_t offset, uint32_t vlen) {
+        key_offset_vlen_tuple_list_.push_back({key, offset, vlen});
     }
 
     void SSTable::InsertKeyToBloomFilter(uint64_t key) {
         bloom_filter_->Insert(key);
     }
+
+    SSTable::SSTable() {
+
+    }
+
+    bool SSTable::Get(uint64_t key, uint64_t& offset, uint32_t& vlen) const {
+        if(key > header_.max_key || key < header_.min_key) {
+            return false;
+        }
+        if(!bloom_filter_->Search(key)) {
+            return false;
+        }
+
+        // 二分查找元组列表
+        uint64_t lh = 0, rh = header_.key_count - 1, mid;
+        while(lh <= rh) {
+            mid = (lh + rh) / 2;
+            if(key == key_offset_vlen_tuple_list_[mid].key) {
+                offset = key_offset_vlen_tuple_list_[mid].offset;
+                vlen = key_offset_vlen_tuple_list_[mid].vlen;
+                return true;
+            } else if(key < key_offset_vlen_tuple_list_[mid].key) {
+                rh = mid - 1;
+            } else {
+                lh = mid + 1;
+            }
+        }
+        return false;
+    }
+
 
 }

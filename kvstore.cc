@@ -35,53 +35,39 @@ void KVStore::put(uint64_t key, const std::string &s)
 {
     mem_table_->Put(key, s);
     if(mem_table_->size() == MEM_TABLE_CAPACITY) {
-        // 写入SSTable
-        utils::mkdir(dir_ + "/level-0");
-        ss_table::SSTable ss_table(++ ss_table_count_, *mem_table_);
-
-        // SSTable Header参数
-        uint64_t time_stamp, key_count = 0, min_key, max_key;
-        // 写入VLog的偏移量
-        uint64_t v_log_offset;
-
-        time_stamp = ss_table_count_;
-        auto it = mem_table_->begin();
-        // 处理第一个结点
-        min_key = (*it).key();
-
-        ss_table.InsertKeyToBloomFilter((*it).key());
-        v_log_offset = v_log_->Insert((*it).key(), (*it).val());
-        ss_table.InsertKeyOffsetVlenTuple((*it).key(), v_log_offset, (*it).val().size());
-        ++ key_count;
-        ++ it;
-        while(it != mem_table_->end()) {
-            ss_table.InsertKeyToBloomFilter((*it).key());
-            v_log_offset = v_log_->Insert((*it).key(), (*it).val());
-            ss_table.InsertKeyOffsetVlenTuple((*it).key(), v_log_offset, (*it).val().size());
-            ++ key_count;
-            if(it.Next() == mem_table_->end()) {
-                // 最后一个结点
-                max_key = (*it).key();
-            }
-            ++ it;
-        }
-        ss_table.set_header(time_stamp, key_count, min_key, max_key);
-
-        // 将SSTable写入文件
-        std::stringstream stream;
-        stream << dir_ << "/level-0/" << ss_table_count_ << ".sst";
-        ss_table.WriteToFile(stream.str());
-
+        ConvertMemTableToSSTable();
         mem_table_->Reset();
     }
 }
 /**
- * Returns the (string) value of the given key_.
+ * Returns the (string) value of the given key.
  * An empty string indicates not found.
  */
 std::string KVStore::get(uint64_t key)
 {
-	return mem_table_->Get(key);
+	std::string mem_table_get_res = mem_table_->Get(key);
+    if(!mem_table_get_res.empty()) {
+        return mem_table_get_res;
+    }
+    std::vector<std::string> level_0_ss_table_vector;
+    utils::scanDir("data/level-0",level_0_ss_table_vector);
+    ss_table::SSTable *ss_table;
+    for(const auto& ss_table_file_name: level_0_ss_table_vector) {
+        ss_table = new ss_table::SSTable;
+        if(ss_table->ReadFromFile("data/level-0/" + ss_table_file_name)) {
+            uint64_t offset; uint32_t vlen;
+            if(ss_table->Get(key, offset, vlen)) {
+                delete ss_table;
+                auto res = v_log_->Get(offset, vlen);
+                return res;
+            }
+
+        } else {
+            std::cerr << "Reading SSTable file error." << std::endl;
+        }
+        delete ss_table;
+    }
+    return "";
 }
 /**
  * Delete the given key_-value pair if it exists.
@@ -117,4 +103,42 @@ void KVStore::scan(uint64_t key1, uint64_t key2, std::list<std::pair<uint64_t, s
  */
 void KVStore::gc(uint64_t chunk_size)
 {
+}
+
+void KVStore::ConvertMemTableToSSTable() {
+    utils::mkdir(dir_ + "/level-0");
+    ss_table::SSTable ss_table(++ ss_table_count_, *mem_table_);
+
+    // SSTable Header参数
+    uint64_t time_stamp, key_count = 0, min_key, max_key;
+    // 写入VLog的偏移量
+    uint64_t v_log_offset;
+
+    time_stamp = ss_table_count_;
+    auto it = mem_table_->begin();
+    // 处理第一个结点
+    min_key = (*it).key();
+
+    ss_table.InsertKeyToBloomFilter((*it).key());
+    v_log_offset = v_log_->Insert((*it).key(), (*it).val());
+    ss_table.InsertKeyOffsetVlenTuple((*it).key(), v_log_offset, (*it).val().size());
+    ++ key_count;
+    ++ it;
+    while(it != mem_table_->end()) {
+        ss_table.InsertKeyToBloomFilter((*it).key());
+        v_log_offset = v_log_->Insert((*it).key(), (*it).val());
+        ss_table.InsertKeyOffsetVlenTuple((*it).key(), v_log_offset, (*it).val().size());
+        ++ key_count;
+        if(it.Next() == mem_table_->end()) {
+            // 最后一个结点
+            max_key = (*it).key();
+        }
+        ++ it;
+    }
+    ss_table.set_header(time_stamp, key_count, min_key, max_key);
+
+    // 将SSTable写入文件
+    std::stringstream stream;
+    stream << dir_ << "/level-0/" << ss_table_count_ << ".sst";
+    ss_table.WriteToFile(stream.str());
 }
