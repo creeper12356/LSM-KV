@@ -16,90 +16,27 @@ namespace skip_list {
         headers_.push_back(new Node);
     }
     void SkipList::Put(uint64_t key, const std::string &val) {
-        assert(!headers_.empty());
-
-        Node* cur_node = headers_.back();
-        while(true) {
-            if (cur_node->is_header_ || cur_node->key_ < key) {
-                if (!cur_node->succ_ || cur_node->succ_->key_ > key) {
-                    if (cur_node->below_) {
-                        //go down
-                        cur_node = cur_node->below_;
-                    } else {
-                        // cur_node位于最底层
-                        //新结点插入双链表
-                        auto new_node = new Node(key, val, cur_node, cur_node->succ_);
-                        cur_node->succ_ = new_node;
-                        if (new_node->succ_) {
-                            new_node->succ_->prev_ = new_node;
-                        }
-                        auto val_ptr = new_node->val_ptr_;
-
-
-                        cur_node = new_node;
-                        //按照概率垂直增高
-                        int new_level = 1;
-                        while (utils::random() < probability_) {
-                            // val_ptr浅拷贝
-                            cur_node->above_ = new Node(key, val_ptr, nullptr, nullptr, nullptr, cur_node);
-                            cur_node = cur_node->above_;
-                            ++new_level;
-                        }
-                        //更新跳表高度
-                        if (headers_.size() < new_level) {
-                            int count = new_level - headers_.size();
-                            while (count != 0) {
-                                // m_headers剩余位置补齐头节点
-                                auto new_header_node = new Node;
-                                new_header_node->below_ = headers_.back();
-                                headers_.back()->above_ = new_header_node;
-
-                                headers_.push_back(new_header_node);
-                                --count;
-                            }
-                        }
-
-                        //逐层水平连接
-                        //fix : bug
-                        new_node = new_node->above_;
-                        for (int i = 1; i < new_level; ++i) {
-                            cur_node = headers_[i];
-                            while (true) {
-                                if (cur_node->is_header_ || cur_node->key_ < key) {
-                                    if (!cur_node->succ_ || cur_node->succ_->key_ > key) {
-                                        //新结点插入双链表
-                                        new_node->prev_ = cur_node;
-                                        new_node->succ_ = cur_node->succ_;
-                                        cur_node->succ_ = new_node;
-                                        if (new_node->succ_) {
-                                            new_node->succ_->prev_ = new_node;
-                                        }
-                                        break;
-                                    }
-                                }
-                                cur_node = cur_node->succ_;
-                            }
-                            //update new_node
-                            new_node = new_node->above_;
-                        }
-                        ++ size_;
-                        return;
-                    }
-                } else {
-                    cur_node = cur_node->succ_;
-                }
-            } else if (cur_node->key_ == key) {
-                // 查找成功，直接覆盖
-                while (cur_node->below_) {
-                    cur_node = cur_node->below_;
-                }
-                cur_node->val() = val;
-                return;
-            } else {
-                //cur_node->key_ > key_
-                // control never reaches here.
-                assert(false);
+        bool is_found;
+        auto res_node = GetNode(key, &is_found);
+        if(is_found) {
+            // 查找成功，直接覆盖
+            while (res_node->below_) {
+                res_node = res_node->below_;
             }
+            res_node->val() = val;
+        }
+        else {
+            // 未查找成功，插入新结点
+            auto new_node = new Node(key, val);
+            InsertSuccNode(new_node, res_node);
+            int height = GrowUpVertically(new_node, probability_);
+            UpdateHeight(height);
+            new_node = new_node->above_;
+            for (int i = 1; i < height; ++i) {
+                InsertNodeHorizonally(new_node, headers_[i]);
+                new_node = new_node->above_;
+            }
+            ++ size_;
         }
     }
     bool SkipList::Del(uint64_t key) {
@@ -224,6 +161,60 @@ namespace skip_list {
     SkipList::Node *SkipList::header() const {
         assert(!headers_.empty());
         return headers_[0];
+    }
+
+    void SkipList::InsertSuccNode(SkipList::Node *inserted, SkipList::Node *prev) {
+        assert(inserted && prev);
+        inserted->prev_ = prev;
+        inserted->succ_ = prev->succ_;
+        prev->succ_ = inserted;
+        if(inserted->succ_) {
+            inserted->succ_->prev_ = inserted;
+        }
+    }
+
+    int SkipList::GrowUpVertically(SkipList::Node *base_node, double growth_probability) {
+        Node *cur_node = base_node;
+        int height = 1;
+        while (utils::random() < growth_probability) {
+            // 浅拷贝base_node.val_ptr
+            cur_node->above_ = new Node(base_node->key_, base_node->val_ptr_, nullptr, nullptr, nullptr, cur_node);
+            cur_node = cur_node->above_;
+            ++ height;
+        }
+        return height;
+    }
+
+    bool SkipList::UpdateHeight(int height) {
+        if(headers_.size() >= height) {
+            return false;
+        }
+
+        int count = height - headers_.size();
+        while (count != 0) {
+            // m_headers剩余位置补齐头节点
+            auto new_header_node = new Node;
+            new_header_node->below_ = headers_.back();
+            headers_.back()->above_ = new_header_node;
+
+            headers_.push_back(new_header_node);
+            --count;
+        }
+        return true;
+    }
+
+    void SkipList::InsertNodeHorizonally(SkipList::Node *inserted, SkipList::Node *header) {
+        assert(inserted && header);
+        Node *cur_node = header;
+        while (true) {
+            if (cur_node->is_header_ || cur_node->key_ < inserted->key_) {
+                if (!cur_node->succ_ || cur_node->succ_->key_ > inserted->key_) {
+                    InsertSuccNode(inserted, cur_node);
+                    break;
+                }
+            }
+            cur_node = cur_node->succ_;
+        }
     }
 
 

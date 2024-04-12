@@ -34,6 +34,7 @@ KVStore::~KVStore()
 void KVStore::put(uint64_t key, const std::string &s)
 {
     mem_table_->Put(key, s);
+    return ;
     if(mem_table_->size() == MEM_TABLE_CAPACITY) {
         ConvertMemTableToSSTable();
         mem_table_->Reset();
@@ -45,6 +46,8 @@ void KVStore::put(uint64_t key, const std::string &s)
  */
 std::string KVStore::get(uint64_t key)
 {
+    return mem_table_->Get(key);
+
 	std::string mem_table_get_res = mem_table_->Get(key);
     if(!mem_table_get_res.empty()) {
         return mem_table_get_res;

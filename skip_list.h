@@ -61,6 +61,35 @@ namespace skip_list {
          * 如果is_found不为空，通过is_found返回是否查找成功。
          */
         Node *GetNode(uint64_t key, bool* is_found) const;
+
+        /**
+         * @brief 将结点插入水平链表
+         * @param inserted 被插入结点
+         * @param header 被插入链表的头结点
+         */
+        static void InsertNodeHorizonally(Node *inserted, Node* header);
+        /**
+         * @brief 将结点作为后继插入
+         * @details 将结点inserted插入结点prev和prev的后继结点之间。
+         * @param inserted 被插入结点
+         * @param prev 被插入结点前驱
+         */
+        static void InsertSuccNode(Node *inserted, Node *prev);
+
+        /**
+         * @brief 依概率垂直向上生长
+         * @param base_node 生长的基结点
+         * @param growth_probability 生长概率
+         * @return 基结点到顶部结点的路径高度
+         */
+        static int GrowUpVertically(Node *base_node, double growth_probability);
+
+        /**
+         * @brief 更新跳表的高度
+         * @param height 更新后的跳表高度
+         * @return 是否更新了高度
+         */
+        bool UpdateHeight(int height);
         
         /**
          * @brief 清空跳表
