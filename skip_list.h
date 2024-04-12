@@ -68,6 +68,7 @@ namespace skip_list {
          * @param header 被插入链表的头结点
          */
         static void InsertNodeHorizonally(Node *inserted, Node* header);
+
         /**
          * @brief 将结点作为后继插入
          * @details 将结点inserted插入结点prev和prev的后继结点之间。

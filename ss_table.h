@@ -50,6 +50,9 @@ namespace ss_table {
          */
         void set_header(uint64_t time_stamp, uint64_t key_count, uint64_t min_key, uint64_t max_key);
 
+
+        const Header& header() const;
+
         /**
          * @brief 向Bloom过滤器中插入键
          * @param key 插入的键

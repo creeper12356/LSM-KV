@@ -98,5 +98,9 @@ namespace ss_table {
         return false;
     }
 
+    const Header &SSTable::header() const {
+        return header_;
+    }
+
 
 }

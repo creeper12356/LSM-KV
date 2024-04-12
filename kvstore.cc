@@ -34,7 +34,6 @@ KVStore::~KVStore()
 void KVStore::put(uint64_t key, const std::string &s)
 {
     mem_table_->Put(key, s);
-    return ;
     if(mem_table_->size() == MEM_TABLE_CAPACITY) {
         ConvertMemTableToSSTable();
         mem_table_->Reset();
@@ -46,23 +45,27 @@ void KVStore::put(uint64_t key, const std::string &s)
  */
 std::string KVStore::get(uint64_t key)
 {
-    return mem_table_->Get(key);
-
 	std::string mem_table_get_res = mem_table_->Get(key);
+    if(mem_table_get_res == DELETED) {
+        // 内存表中标记为删除
+        return "";
+    }
     if(!mem_table_get_res.empty()) {
+        // 内存表中查找成功
         return mem_table_get_res;
     }
     std::vector<std::string> level_0_ss_table_vector;
-    utils::scanDir("data/level-0",level_0_ss_table_vector);
+    utils::scanDir("data/level-0", level_0_ss_table_vector);
     ss_table::SSTable *ss_table;
+    uint64_t latest_time_stamp = 0;
+    std::string result;
     for(const auto& ss_table_file_name: level_0_ss_table_vector) {
         ss_table = new ss_table::SSTable;
         if(ss_table->ReadFromFile("data/level-0/" + ss_table_file_name)) {
             uint64_t offset; uint32_t vlen;
-            if(ss_table->Get(key, offset, vlen)) {
-                delete ss_table;
-                auto res = v_log_->Get(offset, vlen);
-                return res;
+            if(ss_table->Get(key, offset, vlen) && ss_table->header().time_stamp > latest_time_stamp) {
+                result = vlen ? v_log_->Get(offset, vlen) : "";
+                latest_time_stamp = ss_table->header().time_stamp;
             }
 
         } else {
@@ -70,15 +73,20 @@ std::string KVStore::get(uint64_t key)
         }
         delete ss_table;
     }
-    return "";
+    return result;
 }
 /**
- * Delete the given key_-value pair if it exists.
+ * Delete the given key-value pair if it exists.
  * Returns false iff the key_ is not found.
  */
 bool KVStore::del(uint64_t key)
 {
-	return mem_table_->Del(key);
+    if(this->get(key).empty()) {
+        return false;
+    }
+
+    mem_table_->Put(key, DELETED);
+    return true;
 }
 
 /**
@@ -88,6 +96,13 @@ bool KVStore::del(uint64_t key)
 void KVStore::reset()
 {
     mem_table_->Reset();
+
+    // 删除data/level-0目录下的所有文件
+    std::vector<std::string> dir_file_name_vector;
+    utils::scanDir("data/level-0", dir_file_name_vector);
+    for(const auto& file_name: dir_file_name_vector) {
+        utils::rmfile("data/level-0/" + file_name);
+    }
 }
 
 /**
@@ -97,7 +112,14 @@ void KVStore::reset()
  */
 void KVStore::scan(uint64_t key1, uint64_t key2, std::list<std::pair<uint64_t, std::string>> &list)
 {
-    mem_table_->Scan(key1, key2, list);
+//    mem_table_->Scan(key1, key2, list);
+    // naive 实现
+    for(auto i = key1; i <= key2; ++i) {
+        auto get_result = get(i);
+        if(!get_result.empty()) {
+            list.emplace_back(i, get_result);
+        }
+    }
 }
 
 /**
@@ -123,14 +145,22 @@ void KVStore::ConvertMemTableToSSTable() {
     min_key = (*it).key();
 
     ss_table.InsertKeyToBloomFilter((*it).key());
-    v_log_offset = v_log_->Insert((*it).key(), (*it).val());
-    ss_table.InsertKeyOffsetVlenTuple((*it).key(), v_log_offset, (*it).val().size());
+    if((*it).val() == DELETED) {
+        ss_table.InsertKeyOffsetVlenTuple((*it).key(), 0, 0);
+    } else {
+        v_log_offset = v_log_->Insert((*it).key(), (*it).val());
+        ss_table.InsertKeyOffsetVlenTuple((*it).key(), v_log_offset, (*it).val().size());
+    }
     ++ key_count;
     ++ it;
     while(it != mem_table_->end()) {
         ss_table.InsertKeyToBloomFilter((*it).key());
-        v_log_offset = v_log_->Insert((*it).key(), (*it).val());
-        ss_table.InsertKeyOffsetVlenTuple((*it).key(), v_log_offset, (*it).val().size());
+        if((*it).val() == DELETED) {
+            ss_table.InsertKeyOffsetVlenTuple((*it).key(), 0, 0);
+        } else {
+            v_log_offset = v_log_->Insert((*it).key(), (*it).val());
+            ss_table.InsertKeyOffsetVlenTuple((*it).key(), v_log_offset, (*it).val().size());
+        }
         ++ key_count;
         if(it.Next() == mem_table_->end()) {
             // 最后一个结点

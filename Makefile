@@ -9,4 +9,4 @@ correctness: kvstore.o correctness.o skip_list.o bloom_filter.o ss_table.o v_log
 persistence: kvstore.o persistence.o skip_list.o bloom_filter.o ss_table.o v_log.o
 
 clean:
-	-rm -f correctness persistence *.o data/level-0/*
+	-rm -f correctness persistence *.o
