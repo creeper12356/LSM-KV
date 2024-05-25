@@ -5,25 +5,22 @@
 #include "v_log.h"
 #include "utils.h"
 #include "inc.h"
+#include "utils/logger.h"
 
 #include <iostream>
 #include <string>
 #include <sstream>
 
-
 KVStore::KVStore(const std::string &dir, const std::string &vlog)
-: KVStoreAPI(dir, vlog)
-, dir_(dir)
-, ss_table_count_(0)
+    : KVStoreAPI(dir, vlog), dir_(dir), ss_table_count_(0)
 {
-    std::cout << "dir = " <<  dir_ << std::endl;
     mem_table_ = new skip_list::SkipList;
     v_log_ = new v_log::VLog(vlog);
 }
 
 KVStore::~KVStore()
 {
-	delete mem_table_;
+    delete mem_table_;
     delete v_log_;
 }
 
@@ -34,7 +31,8 @@ KVStore::~KVStore()
 void KVStore::put(uint64_t key, const std::string &s)
 {
     mem_table_->Put(key, s);
-    if(mem_table_->size() == MEM_TABLE_CAPACITY) {
+    if (mem_table_->size() == MEM_TABLE_CAPACITY)
+    {
         ConvertMemTableToSSTable();
         mem_table_->Reset();
     }
@@ -45,12 +43,14 @@ void KVStore::put(uint64_t key, const std::string &s)
  */
 std::string KVStore::get(uint64_t key)
 {
-	std::string mem_table_get_res = mem_table_->Get(key);
-    if(mem_table_get_res == DELETED) {
+    std::string mem_table_get_res = mem_table_->Get(key);
+    if (mem_table_get_res == DELETED)
+    {
         // 内存表中标记为删除
         return "";
     }
-    if(!mem_table_get_res.empty()) {
+    if (!mem_table_get_res.empty())
+    {
         // 内存表中查找成功
         return mem_table_get_res;
     }
@@ -59,16 +59,21 @@ std::string KVStore::get(uint64_t key)
     ss_table::SSTable *ss_table;
     uint64_t latest_time_stamp = 0;
     std::string result;
-    for(const auto& ss_table_file_name: level_0_ss_table_vector) {
+    for (const auto &ss_table_file_name : level_0_ss_table_vector)
+    {
         ss_table = new ss_table::SSTable;
-        if(ss_table->ReadFromFile("data/level-0/" + ss_table_file_name)) {
-            uint64_t offset; uint32_t vlen;
-            if(ss_table->Get(key, offset, vlen) && ss_table->header().time_stamp > latest_time_stamp) {
+        if (ss_table->ReadFromFile("data/level-0/" + ss_table_file_name))
+        {
+            uint64_t offset;
+            uint32_t vlen;
+            if (ss_table->Get(key, offset, vlen) && ss_table->header().time_stamp > latest_time_stamp)
+            {
                 result = vlen ? v_log_->Get(offset, vlen) : "";
                 latest_time_stamp = ss_table->header().time_stamp;
             }
-
-        } else {
+        }
+        else
+        {
             std::cerr << "Reading SSTable file error." << std::endl;
         }
         delete ss_table;
@@ -81,7 +86,8 @@ std::string KVStore::get(uint64_t key)
  */
 bool KVStore::del(uint64_t key)
 {
-    if(this->get(key).empty()) {
+    if (this->get(key).empty())
+    {
         return false;
     }
 
@@ -100,7 +106,8 @@ void KVStore::reset()
     // 删除data/level-0目录下的所有文件
     std::vector<std::string> dir_file_name_vector;
     utils::scanDir("data/level-0", dir_file_name_vector);
-    for(const auto& file_name: dir_file_name_vector) {
+    for (const auto &file_name : dir_file_name_vector)
+    {
         utils::rmfile("data/level-0/" + file_name);
     }
 }
@@ -112,11 +119,13 @@ void KVStore::reset()
  */
 void KVStore::scan(uint64_t key1, uint64_t key2, std::list<std::pair<uint64_t, std::string>> &list)
 {
-//    mem_table_->Scan(key1, key2, list);
+    //    mem_table_->Scan(key1, key2, list);
     // naive 实现
-    for(auto i = key1; i <= key2; ++i) {
+    for (auto i = key1; i <= key2; ++i)
+    {
         auto get_result = get(i);
-        if(!get_result.empty()) {
+        if (!get_result.empty())
+        {
             list.emplace_back(i, get_result);
         }
     }
@@ -130,9 +139,10 @@ void KVStore::gc(uint64_t chunk_size)
 {
 }
 
-void KVStore::ConvertMemTableToSSTable() {
+void KVStore::ConvertMemTableToSSTable()
+{
     utils::mkdir(dir_ + "/level-0");
-    ss_table::SSTable ss_table(++ ss_table_count_, *mem_table_);
+    ss_table::SSTable ss_table(++ss_table_count_, *mem_table_);
 
     // SSTable Header参数
     uint64_t time_stamp, key_count = 0, min_key, max_key;
@@ -145,28 +155,36 @@ void KVStore::ConvertMemTableToSSTable() {
     min_key = (*it).key();
 
     ss_table.InsertKeyToBloomFilter((*it).key());
-    if((*it).val() == DELETED) {
+    if ((*it).val() == DELETED)
+    {
         ss_table.InsertKeyOffsetVlenTuple((*it).key(), 0, 0);
-    } else {
+    }
+    else
+    {
         v_log_offset = v_log_->Insert((*it).key(), (*it).val());
         ss_table.InsertKeyOffsetVlenTuple((*it).key(), v_log_offset, (*it).val().size());
     }
-    ++ key_count;
-    ++ it;
-    while(it != mem_table_->end()) {
+    ++key_count;
+    ++it;
+    while (it != mem_table_->end())
+    {
         ss_table.InsertKeyToBloomFilter((*it).key());
-        if((*it).val() == DELETED) {
+        if ((*it).val() == DELETED)
+        {
             ss_table.InsertKeyOffsetVlenTuple((*it).key(), 0, 0);
-        } else {
+        }
+        else
+        {
             v_log_offset = v_log_->Insert((*it).key(), (*it).val());
             ss_table.InsertKeyOffsetVlenTuple((*it).key(), v_log_offset, (*it).val().size());
         }
-        ++ key_count;
-        if(it.Next() == mem_table_->end()) {
+        ++key_count;
+        if (it.Next() == mem_table_->end())
+        {
             // 最后一个结点
             max_key = (*it).key();
         }
-        ++ it;
+        ++it;
     }
     ss_table.set_header(time_stamp, key_count, min_key, max_key);
 
