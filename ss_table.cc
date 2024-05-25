@@ -11,6 +11,8 @@
 
 namespace ss_table {
 
+
+
     SSTable::SSTable(uint64_t time_stamp, const skip_list::SkipList& mem_table) {
         bloom_filter_ = new bloom_filter::BloomFilter(BLOOM_FILTER_VECTOR_SIZE);
         header_.time_stamp = time_stamp;
@@ -73,29 +75,32 @@ namespace ss_table {
 
     }
 
-    bool SSTable::Get(uint64_t key, uint64_t& offset, uint32_t& vlen) const {
+    std::optional<SSTableGetResult> SSTable::Get(uint64_t key) const
+    {
         if(key > header_.max_key || key < header_.min_key) {
-            return false;
+            return std::nullopt;
         }
         if(!bloom_filter_->Search(key)) {
-            return false;
+            return std::nullopt;
         }
 
         // 二分查找元组列表
+        SSTableGetResult result;
         uint64_t lh = 0, rh = header_.key_count - 1, mid;
         while(lh <= rh) {
             mid = (lh + rh) / 2;
             if(key == key_offset_vlen_tuple_list_[mid].key) {
-                offset = key_offset_vlen_tuple_list_[mid].offset;
-                vlen = key_offset_vlen_tuple_list_[mid].vlen;
-                return true;
+                result.offset = key_offset_vlen_tuple_list_[mid].offset;
+                result.vlen = key_offset_vlen_tuple_list_[mid].vlen;
+                return result;
             } else if(key < key_offset_vlen_tuple_list_[mid].key) {
                 rh = mid - 1;
             } else {
                 lh = mid + 1;
             }
         }
-        return false;
+        
+        return std::nullopt;
     }
 
     const Header &SSTable::header() const {

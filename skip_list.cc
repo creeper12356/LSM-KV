@@ -95,7 +95,6 @@ namespace skip_list {
     {
         this->Clear();
         headers_.push_back(new Node);
-        size_ = 0;
     }
     SkipList::Node* SkipList::GetNode(uint64_t key, bool* is_found) const
     {
@@ -139,6 +138,7 @@ namespace skip_list {
             }
         }
         headers_.clear();
+        this->size_ = 0;
     }
     std::string SkipList::Get(uint64_t key) const {
         bool is_found;

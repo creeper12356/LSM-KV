@@ -6,33 +6,46 @@
 #define LSMKV_HANDOUT_SS_TABLE_H
 #include <string>
 #include <vector>
-namespace skip_list {
+#include <optional>
+
+namespace skip_list
+{
     class SkipList;
 }
-namespace bloom_filter {
+namespace bloom_filter
+{
     class BloomFilter;
 }
 
-namespace ss_table {
-    struct Header {
+namespace ss_table
+{
+    struct SSTableGetResult
+    {
+        uint64_t offset;
+        uint32_t vlen;
+    };
+    struct Header
+    {
         uint64_t time_stamp;
         uint64_t key_count;
         uint64_t min_key;
         uint64_t max_key;
     };
-    struct KeyOffsetVlenTuple {
+    struct KeyOffsetVlenTuple
+    {
         uint64_t key;
         uint64_t offset;
         uint32_t vlen;
     };
-    class SSTable {
+    class SSTable
+    {
     public:
         /**
          * @brief 通过时间戳和跳表初始化SSTable
          * @param time_stamp
          * @param mem_table
          */
-        SSTable(uint64_t time_stamp, const skip_list::SkipList& mem_table);
+        SSTable(uint64_t time_stamp, const skip_list::SkipList &mem_table);
 
         /**
          * @brief 初始化空的SSTable
@@ -40,6 +53,7 @@ namespace ss_table {
          */
         SSTable();
         ~SSTable();
+
     public:
         /**
          * @brief 设置SSTable的Header部分
@@ -50,8 +64,7 @@ namespace ss_table {
          */
         void set_header(uint64_t time_stamp, uint64_t key_count, uint64_t min_key, uint64_t max_key);
 
-
-        const Header& header() const;
+        const Header &header() const;
 
         /**
          * @brief 向Bloom过滤器中插入键
@@ -78,21 +91,20 @@ namespace ss_table {
          * @param file_name 文件名
          */
         void WriteToFile(const std::string &file_name) const;
+        
         /**
-         * @brief 查找键
-         * @param key
-         * @param offset 返回的偏移量
-         * @param vlen 返回的值长度
-         * @return 是否查找成功，当且仅当返回值为true时，offset, vlen有意义。
+         * @brief 在SSTable中查找键
+         * 
+         * @param key 查找的键
+         * @return std::optional<SSTableGetResult> 查找结果，当查找成功时返回查找结果，否则返回std::nullopt
          */
-        bool Get(uint64_t key, uint64_t& offset, uint32_t& vlen) const;
+        std::optional<SSTableGetResult> Get(uint64_t key) const;
+
     private:
         Header header_;
-        bloom_filter::BloomFilter* bloom_filter_ = nullptr;
+        bloom_filter::BloomFilter *bloom_filter_ = nullptr;
         std::vector<KeyOffsetVlenTuple> key_offset_vlen_tuple_list_;
     };
 }
 
-
-
-#endif //LSMKV_HANDOUT_SS_TABLE_H
+#endif // LSMKV_HANDOUT_SS_TABLE_H

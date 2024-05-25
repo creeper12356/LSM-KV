@@ -49,7 +49,7 @@ namespace skip_list {
 
 
         int size() const;
-
+    
     private:
 
         /**
@@ -94,7 +94,7 @@ namespace skip_list {
         
         /**
          * @brief 清空跳表
-         * @details 回收所有动态内存，并清空m_headers.
+         * @details 清空跳表，回收所有动态内存，并清空m_headers.
          */
         void Clear();
 

@@ -43,46 +43,53 @@ void KVStore::put(uint64_t key, const std::string &s)
  */
 std::string KVStore::get(uint64_t key)
 {
-    std::string mem_table_get_res = mem_table_->Get(key);
-    if (mem_table_get_res == DELETED)
+    std::string mem_table_get_result = mem_table_->Get(key);
+    if (mem_table_get_result == DELETED)
     {
-        // 内存表中标记为删除
+        // 内存表中查找到删除标记
         return "";
     }
-    if (!mem_table_get_res.empty())
+    if (!mem_table_get_result.empty())
     {
         // 内存表中查找成功
-        return mem_table_get_res;
+        return mem_table_get_result;
     }
-    std::vector<std::string> level_0_ss_table_vector;
-    utils::scanDir("data/level-0", level_0_ss_table_vector);
+
+    // 从SSTable中查找
+    std::vector<std::string> ss_table_file_name_list;
+    utils::scanDir("data/level-0", ss_table_file_name_list);
+
     ss_table::SSTable *ss_table;
     uint64_t latest_time_stamp = 0;
     std::string result;
-    for (const auto &ss_table_file_name : level_0_ss_table_vector)
+    for (const auto &ss_table_file_name : ss_table_file_name_list)
     {
         ss_table = new ss_table::SSTable;
-        if (ss_table->ReadFromFile("data/level-0/" + ss_table_file_name))
-        {
-            uint64_t offset;
-            uint32_t vlen;
-            if (ss_table->Get(key, offset, vlen) && ss_table->header().time_stamp > latest_time_stamp)
-            {
-                result = vlen ? v_log_->Get(offset, vlen) : "";
-                latest_time_stamp = ss_table->header().time_stamp;
-            }
+        if (!ss_table->ReadFromFile("data/level-0/" + ss_table_file_name)) {
+            Logger::error("KVStore::get(): Reading SSTable file error.");
+            delete ss_table;
+            continue;
         }
-        else
+
+        auto ss_table_get_res = ss_table->Get(key);
+        if (ss_table_get_res.has_value() && ss_table->header().time_stamp > latest_time_stamp)
         {
-            std::cerr << "Reading SSTable file error." << std::endl;
+            if(ss_table_get_res.value().vlen) {
+                result = this->v_log_->Get(ss_table_get_res.value().offset, ss_table_get_res.value().vlen);
+            } else {
+                result = "";
+            }
+            latest_time_stamp = ss_table->header().time_stamp;
         }
         delete ss_table;
     }
+
+
     return result;
 }
 /**
  * Delete the given key-value pair if it exists.
- * Returns false iff the key_ is not found.
+ * Returns false iff the key is not found.
  */
 bool KVStore::del(uint64_t key)
 {
@@ -96,7 +103,7 @@ bool KVStore::del(uint64_t key)
 }
 
 /**
- * This resets the kvstore. All key_-value pairs should be removed,
+ * This resets the kvstore. All key-value pairs should be removed,
  * including memtable and all sstables files.
  */
 void KVStore::reset()
@@ -104,16 +111,16 @@ void KVStore::reset()
     mem_table_->Reset();
 
     // 删除data/level-0目录下的所有文件
-    std::vector<std::string> dir_file_name_vector;
-    utils::scanDir("data/level-0", dir_file_name_vector);
-    for (const auto &file_name : dir_file_name_vector)
+    std::vector<std::string> ss_table_file_name_list;
+    utils::scanDir("data/level-0", ss_table_file_name_list);
+    for (const auto &ss_table_file_name : ss_table_file_name_list)
     {
-        utils::rmfile("data/level-0/" + file_name);
+        utils::rmfile("data/level-0/" + ss_table_file_name);
     }
 }
 
 /**
- * Return a list including all the key_-value pair between key1 and key2.
+ * Return a list including all the key-value pair between key1 and key2.
  * keys in the list should be in an ascending order.
  * An empty string indicates not found.
  */
