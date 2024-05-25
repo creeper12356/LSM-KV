@@ -66,7 +66,7 @@ std::string KVStore::get(uint64_t key)
     {
         ss_table = new ss_table::SSTable;
         if (!ss_table->ReadFromFile("data/level-0/" + ss_table_file_name)) {
-            Logger::error("KVStore::get(): Reading SSTable file error.");
+            LOG_ERROR("Reading SSTable file error");
             delete ss_table;
             continue;
         }
