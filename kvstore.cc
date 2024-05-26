@@ -61,7 +61,6 @@ void KVStore::put(uint64_t key, const std::string &s)
         ConvertMemTableToSSTable();
         mem_table_->Reset();
 
-        // TODO: compaction in sstable
         if(!utils::dirExists(dir_ + "/level-0")) {
             utils::mkdir(dir_ + "/level-0");
         }
@@ -91,7 +90,7 @@ void KVStore::put(uint64_t key, const std::string &s)
             std::vector<std::string> level_1_ss_table_file_list;
             utils::scanDir(dir_ + "/level-1", level_1_ss_table_file_list);
             for(const auto &level_1_ss_table_file_name: level_1_ss_table_file_list) {
-                std::unique_ptr<ss_table::SSTable> ss_table = ss_table::SSTable::FromFile(dir_ + "/level-1" + level_1_ss_table_file_name);
+                std::unique_ptr<ss_table::SSTable> ss_table = ss_table::SSTable::FromFile(dir_ + "/level-1/" + level_1_ss_table_file_name);
                 if(!ss_table.get()) {
                     continue;
                 }
@@ -105,10 +104,39 @@ void KVStore::put(uint64_t key, const std::string &s)
             }
 
             // 使用归并排序，将ss_table_list中的SSTable合并
-            // auto merged_key_offset_vlen_tuple_list = ss_table::SSTable::MergeSSTables(ss_table_list);
+            auto merged_time_stamped_tuple_list = ss_table::SSTable::MergeSSTables(ss_table_list);
+            ss_table_count_ -= ss_table_list.size();
+            // 刪除旧的SSTable文件
+            // TODO
 
             // 每16kB分成一个新的SSTable文件
+            uint64_t merged_time_stamped_tuple_count = merged_time_stamped_tuple_list.size();
+            for(uint64_t i = 0;i < merged_time_stamped_tuple_count; i += MEM_TABLE_CAPACITY) {
+                // 判断是不是最后一组
+                int sublist_size = i + (
+                    MEM_TABLE_CAPACITY < merged_time_stamped_tuple_count ?
+                    MEM_TABLE_CAPACITY : merged_time_stamped_tuple_count - i
+                );
+                std::vector<ss_table::TimeStampedKeyOffsetVlenTuple> 
+                    merged_time_stamped_tuple_sublist(
+                        merged_time_stamped_tuple_list.begin() + i, 
+                        merged_time_stamped_tuple_list.begin() + i + sublist_size
+                    );
 
+                uint64_t max_time_stamp = std::numeric_limits<uint64_t>::min();
+                std::vector<ss_table::KeyOffsetVlenTuple> inserted_tuples;
+                for(const auto &time_stamped_tuple: merged_time_stamped_tuple_sublist) {
+                    max_time_stamp = time_stamped_tuple.time_stamp > max_time_stamp ? time_stamped_tuple.time_stamp : max_time_stamp;
+                    inserted_tuples.push_back(time_stamped_tuple.key_offset_vlen_tuple);
+                }
+
+                auto ss_table = ss_table::SSTable::NewSSTable(max_time_stamp, inserted_tuples);
+
+                // 将SSTable写入文件
+                std::stringstream stream;
+                stream << dir_ << "/level-1/" << ss_table_count_ << ".sst";
+                ss_table.get()->WriteToFile(stream.str());
+            }
         }
     }
 }

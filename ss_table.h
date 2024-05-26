@@ -48,6 +48,11 @@ namespace ss_table
             is->read(reinterpret_cast<char *>(&vlen), sizeof(uint32_t));
         }
     };
+    struct TimeStampedKeyOffsetVlenTuple
+    {
+        uint64_t time_stamp;
+        KeyOffsetVlenTuple key_offset_vlen_tuple;
+    };
     class SSTable
     {
     public:
@@ -100,7 +105,7 @@ namespace ss_table
          */
         std::optional<SSTableGetResult> Get(uint64_t key) const;
 
-        static std::vector<KeyOffsetVlenTuple> MergeSSTables(const std::vector<SSTable *> &ss_table_list);
+        static std::vector<TimeStampedKeyOffsetVlenTuple> MergeSSTables(const std::vector<std::unique_ptr<SSTable>> &ss_table_list);
 
     private:
         Header header_;
