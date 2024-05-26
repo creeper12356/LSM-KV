@@ -153,8 +153,7 @@ void KVStore::ConvertMemTableToSSTable()
             inserted_tuples.push_back({(*it).key(), 0, 0});
         } else {
             v_log_offset = v_log_->Insert((*it).key(), (*it).val());
-            // TODO: KeyOffsetVlenTuple通过构造函数传参
-            inserted_tuples.push_back({(*it).key(), v_log_offset, static_cast<uint32_t>((*it).val().size())});
+            inserted_tuples.emplace_back((*it).key(), v_log_offset, (*it).val().size());
         }
     }
 

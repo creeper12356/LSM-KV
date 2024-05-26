@@ -28,11 +28,8 @@ namespace ss_table {
         new_ss_table_uptr.get()->bloom_filter_->ReadFromFile(fin);
 
         auto key_count = new_ss_table_uptr.get()->header_.key_count;
-        KeyOffsetVlenTuple tuple({});
-        for(auto i = 0;i < key_count; ++i) {
-            // 只读取20个字节，padding有4个字节
-            fin.read(reinterpret_cast<char*>(&tuple), 20);
-            new_ss_table_uptr.get()->key_offset_vlen_tuple_list_.push_back(tuple);
+        for(uint64_t i = 0;i < key_count; ++i) {
+            new_ss_table_uptr.get()->key_offset_vlen_tuple_list_.emplace_back(&fin);
         }
         fin.close();
 

@@ -8,6 +8,7 @@
 #include <vector>
 #include <optional>
 #include <memory>
+#include <fstream>
 
 namespace skip_list
 {
@@ -37,6 +38,15 @@ namespace ss_table
         uint64_t key;
         uint64_t offset;
         uint32_t vlen;
+
+        KeyOffsetVlenTuple(uint64_t key, uint64_t offset, uint32_t vlen) 
+            : key(key), offset(offset), vlen(vlen) { }
+
+        KeyOffsetVlenTuple(std::istream *is) {
+            is->read(reinterpret_cast<char *>(&key), sizeof(uint64_t));
+            is->read(reinterpret_cast<char *>(&offset), sizeof(uint64_t));
+            is->read(reinterpret_cast<char *>(&vlen), sizeof(uint32_t));
+        }
     };
     class SSTable
     {
