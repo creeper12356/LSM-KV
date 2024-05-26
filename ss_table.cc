@@ -6,42 +6,64 @@
 #include "bloom_filter.h"
 #include "skip_list.h"
 #include "inc.h"
+#include "utils/logger.h"
 #include <iostream>
 #include <fstream>
+#include <limits>
 
 namespace ss_table {
+    std::unique_ptr<SSTable> SSTable::FromFile(const std::string &file_name)
+    {
+        std::ifstream fin;
+        fin.open(file_name);
+        if(!fin) {
+            LOG_ERROR("Read SSTable file `%s` error", file_name);
+            return nullptr;
+        }
 
+        std::unique_ptr<SSTable> new_ss_table_uptr(new SSTable());
+        fin.read(reinterpret_cast<char*>(&new_ss_table_uptr.get()->header_), sizeof(Header));
+        
+        new_ss_table_uptr.get()->bloom_filter_ = new bloom_filter::BloomFilter(BLOOM_FILTER_VECTOR_SIZE);
+        new_ss_table_uptr.get()->bloom_filter_->ReadFromFile(fin);
 
+        auto key_count = new_ss_table_uptr.get()->header_.key_count;
+        KeyOffsetVlenTuple tuple({});
+        for(auto i = 0;i < key_count; ++i) {
+            // 只读取20个字节，padding有4个字节
+            fin.read(reinterpret_cast<char*>(&tuple), 20);
+            new_ss_table_uptr.get()->key_offset_vlen_tuple_list_.push_back(tuple);
+        }
+        fin.close();
 
-    SSTable::SSTable(uint64_t time_stamp, const skip_list::SkipList& mem_table) {
-        bloom_filter_ = new bloom_filter::BloomFilter(BLOOM_FILTER_VECTOR_SIZE);
-        header_.time_stamp = time_stamp;
+        return new_ss_table_uptr;
     }
+    
+    std::unique_ptr<SSTable> SSTable::NewSSTable(uint64_t time_stamp, const std::vector<KeyOffsetVlenTuple> &inserted_tuples)
+    {
+        std::unique_ptr<SSTable> new_ss_table_uptr(new SSTable());
+        new_ss_table_uptr.get()->bloom_filter_ = new bloom_filter::BloomFilter(BLOOM_FILTER_VECTOR_SIZE);
+        
+        uint64_t min_key = std::numeric_limits<uint64_t>::max(),
+                 max_key = std::numeric_limits<uint64_t>::min();
+        for(const auto &tuple: inserted_tuples) {
+            min_key = tuple.key < min_key ? tuple.key : min_key;
+            max_key = tuple.key > max_key ? tuple.key : max_key;
+
+            new_ss_table_uptr.get()->bloom_filter_->Insert(tuple.key);
+
+            new_ss_table_uptr.get()->key_offset_vlen_tuple_list_.push_back(tuple);
+        }
+        new_ss_table_uptr.get()->header_ = {time_stamp, inserted_tuples.size(), min_key, max_key};
+    
+        return new_ss_table_uptr;
+    }
+
 
     SSTable::~SSTable() {
         delete bloom_filter_;
     }
 
-    bool SSTable::ReadFromFile(const std::string &file_name) {
-        std::ifstream fin;
-        fin.open(file_name);
-        if(!fin) {
-            return false;
-        }
-        fin.read(reinterpret_cast<char*>(&header_), sizeof(Header));
-        bloom_filter_ = new bloom_filter::BloomFilter(BLOOM_FILTER_VECTOR_SIZE);
-
-        bloom_filter_->ReadFromFile(fin);
-
-        for(int i = 0;i < header_.key_count; ++i) {
-            KeyOffsetVlenTuple tuple = {};
-            fin.read(reinterpret_cast<char*>(&tuple), 20);
-            key_offset_vlen_tuple_list_.push_back(tuple);
-        }
-
-        fin.close();
-        return true;
-    }
     void SSTable::WriteToFile(const std::string &file_name) const {
         std::ofstream fout;
         fout.open(file_name , std::ios::out | std::ios::binary);
@@ -61,18 +83,6 @@ namespace ss_table {
         header_.key_count = key_count;
         header_.min_key = min_key;
         header_.max_key = max_key;
-    }
-
-    void SSTable::InsertKeyOffsetVlenTuple(uint64_t key, uint64_t offset, uint32_t vlen) {
-        key_offset_vlen_tuple_list_.push_back({key, offset, vlen});
-    }
-
-    void SSTable::InsertKeyToBloomFilter(uint64_t key) {
-        bloom_filter_->Insert(key);
-    }
-
-    SSTable::SSTable() {
-
     }
 
     std::optional<SSTableGetResult> SSTable::Get(uint64_t key) const

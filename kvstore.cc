@@ -10,6 +10,7 @@
 #include <iostream>
 #include <string>
 #include <sstream>
+#include <memory>
 
 KVStore::KVStore(const std::string &dir, const std::string &vlog)
     : KVStoreAPI(dir, vlog), dir_(dir), ss_table_count_(0)
@@ -59,15 +60,13 @@ std::string KVStore::get(uint64_t key)
     std::vector<std::string> ss_table_file_name_list;
     utils::scanDir("data/level-0", ss_table_file_name_list);
 
-    ss_table::SSTable *ss_table;
+    std::unique_ptr<ss_table::SSTable> ss_table;
     uint64_t latest_time_stamp = 0;
     std::string result;
     for (const auto &ss_table_file_name : ss_table_file_name_list)
     {
-        ss_table = new ss_table::SSTable;
-        if (!ss_table->ReadFromFile("data/level-0/" + ss_table_file_name)) {
-            LOG_ERROR("Reading SSTable file error");
-            delete ss_table;
+        ss_table = ss_table::SSTable::FromFile(dir_ + "/level-0/" + ss_table_file_name);
+        if(!ss_table) {
             continue;
         }
 
@@ -81,10 +80,7 @@ std::string KVStore::get(uint64_t key)
             }
             latest_time_stamp = ss_table->header().time_stamp;
         }
-        delete ss_table;
     }
-
-
     return result;
 }
 /**
@@ -149,54 +145,23 @@ void KVStore::gc(uint64_t chunk_size)
 void KVStore::ConvertMemTableToSSTable()
 {
     utils::mkdir(dir_ + "/level-0");
-    ss_table::SSTable ss_table(++ss_table_count_, *mem_table_);
-
-    // SSTable Header参数
-    uint64_t time_stamp, key_count = 0, min_key, max_key;
-    // 写入VLog的偏移量
-    uint64_t v_log_offset;
-
-    time_stamp = ss_table_count_;
-    auto it = mem_table_->begin();
-    // 处理第一个结点
-    min_key = (*it).key();
-
-    ss_table.InsertKeyToBloomFilter((*it).key());
-    if ((*it).val() == DELETED)
-    {
-        ss_table.InsertKeyOffsetVlenTuple((*it).key(), 0, 0);
-    }
-    else
-    {
-        v_log_offset = v_log_->Insert((*it).key(), (*it).val());
-        ss_table.InsertKeyOffsetVlenTuple((*it).key(), v_log_offset, (*it).val().size());
-    }
-    ++key_count;
-    ++it;
-    while (it != mem_table_->end())
-    {
-        ss_table.InsertKeyToBloomFilter((*it).key());
-        if ((*it).val() == DELETED)
-        {
-            ss_table.InsertKeyOffsetVlenTuple((*it).key(), 0, 0);
-        }
-        else
-        {
+    // 准备inserted_tuples
+    std::vector<ss_table::KeyOffsetVlenTuple> inserted_tuples;
+    uint64_t v_log_offset;  // 写入VLog的偏移量
+    for(auto it = mem_table_->begin(); it != mem_table_->end(); ++it) {
+        if((*it).val() == DELETED) {
+            inserted_tuples.push_back({(*it).key(), 0, 0});
+        } else {
             v_log_offset = v_log_->Insert((*it).key(), (*it).val());
-            ss_table.InsertKeyOffsetVlenTuple((*it).key(), v_log_offset, (*it).val().size());
+            // TODO: KeyOffsetVlenTuple通过构造函数传参
+            inserted_tuples.push_back({(*it).key(), v_log_offset, static_cast<uint32_t>((*it).val().size())});
         }
-        ++key_count;
-        if (it.Next() == mem_table_->end())
-        {
-            // 最后一个结点
-            max_key = (*it).key();
-        }
-        ++it;
     }
-    ss_table.set_header(time_stamp, key_count, min_key, max_key);
+
+    auto ss_table = ss_table::SSTable::NewSSTable(++ss_table_count_, inserted_tuples);
 
     // 将SSTable写入文件
     std::stringstream stream;
     stream << dir_ << "/level-0/" << ss_table_count_ << ".sst";
-    ss_table.WriteToFile(stream.str());
+    ss_table.get()->WriteToFile(stream.str());
 }

@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <memory>
 
 namespace skip_list
 {
@@ -41,17 +42,25 @@ namespace ss_table
     {
     public:
         /**
-         * @brief 通过时间戳和跳表初始化SSTable
-         * @param time_stamp
-         * @param mem_table
+         * @brief 从SSTable文件生成缓存
+         * 
+         * @param file_name 
+         * @return std::unique_ptr<SSTable> 
          */
-        SSTable(uint64_t time_stamp, const skip_list::SkipList &mem_table);
+        static std::unique_ptr<SSTable> FromFile(const std::string &file_name);
 
         /**
-         * @brief 初始化空的SSTable
-         * @details 初始化空的SSTable，初始化后需要调用ReadFromFile函数
+         * @brief 创建新的SSTable缓存
+         * 
+         * @param time_stamp 
+         * @param inserted_tuples 
+         * @return std::unique_ptr<SSTable> 
          */
-        SSTable();
+        static std::unique_ptr<SSTable> NewSSTable(uint64_t time_stamp, const std::vector<KeyOffsetVlenTuple> &inserted_tuples);
+    
+    private:
+        SSTable() = default;
+    public:
         ~SSTable();
 
     public:
@@ -67,34 +76,14 @@ namespace ss_table
         const Header &header() const;
 
         /**
-         * @brief 向Bloom过滤器中插入键
-         * @param key 插入的键
-         */
-        void InsertKeyToBloomFilter(uint64_t key);
-
-        /**
-         * @brief 向SSTable中插入一个<Key,Offset,Vlen> 元组
-         * @param key 键
-         * @param offset VLog文件中的偏移量
-         * @param vlen 值的长度
-         */
-        void InsertKeyOffsetVlenTuple(uint64_t key, uint64_t offset, uint32_t vlen);
-        /**
-         * @brief 从文件中读取SSTable
-         * @param file_name 文件名
-         * @return 是否读取成功
-         */
-        bool ReadFromFile(const std::string &file_name);
-
-        /**
          * @brief 将当前SSTable状态写入文件
          * @param file_name 文件名
          */
         void WriteToFile(const std::string &file_name) const;
-        
+
         /**
          * @brief 在SSTable中查找键
-         * 
+         *
          * @param key 查找的键
          * @return std::optional<SSTableGetResult> 查找结果，当查找成功时返回查找结果，否则返回std::nullopt
          */
