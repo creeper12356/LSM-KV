@@ -34,11 +34,12 @@ namespace ss_table {
             new_ss_table_uptr.get()->key_offset_vlen_tuple_list_.emplace_back(&fin);
         }
         fin.close();
+        new_ss_table_uptr.get()->file_name_ = file_name;
 
         return new_ss_table_uptr;
     }
     
-    std::unique_ptr<SSTable> SSTable::NewSSTable(uint64_t time_stamp, const std::vector<KeyOffsetVlenTuple> &inserted_tuples)
+    std::unique_ptr<SSTable> SSTable::NewSSTable(const std::string &file_name, uint64_t time_stamp, const std::vector<KeyOffsetVlenTuple> &inserted_tuples)
     {
         std::unique_ptr<SSTable> new_ss_table_uptr(new SSTable());
         new_ss_table_uptr.get()->bloom_filter_ = new bloom_filter::BloomFilter(BLOOM_FILTER_VECTOR_SIZE);
@@ -54,7 +55,7 @@ namespace ss_table {
             new_ss_table_uptr.get()->key_offset_vlen_tuple_list_.push_back(tuple);
         }
         new_ss_table_uptr.get()->header_ = {time_stamp, inserted_tuples.size(), min_key, max_key};
-    
+        new_ss_table_uptr.get()->file_name_ = file_name;
         return new_ss_table_uptr;
     }
 
@@ -63,9 +64,9 @@ namespace ss_table {
         delete bloom_filter_;
     }
 
-    void SSTable::WriteToFile(const std::string &file_name) const {
+    void SSTable::WriteToFile() const {
         std::ofstream fout;
-        fout.open(file_name , std::ios::out | std::ios::binary);
+        fout.open(file_name_ , std::ios::out | std::ios::binary);
         fout.write(reinterpret_cast<const char*> (&header_), sizeof(Header));
 
         bloom_filter_->WriteToFile(fout);
@@ -118,6 +119,9 @@ namespace ss_table {
     const std::vector<KeyOffsetVlenTuple> &SSTable::key_offset_vlen_tuple_list() const {
         return key_offset_vlen_tuple_list_;
     }
+    const std::string &SSTable::file_name() const {
+        return file_name_;
+    }
 
     std::vector<TimeStampedKeyOffsetVlenTuple> SSTable::MergeSSTables(const std::vector<std::unique_ptr<SSTable>> &ss_table_list) {
         auto cmp = [](const TimeStampedKeyOffsetVlenTuple &a, const TimeStampedKeyOffsetVlenTuple &b) {
@@ -150,5 +154,12 @@ namespace ss_table {
 
         return merged_results;
     }
+
+
+
+    std::string SSTable::build_file_name(const std::string &dir, int level, const std::string &base_name) {
+        return dir + "/level-" + std::to_string(level) + "/" + base_name;
+    }
+
 
 }

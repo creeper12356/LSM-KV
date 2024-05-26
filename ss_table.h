@@ -67,11 +67,12 @@ namespace ss_table
         /**
          * @brief 创建新的SSTable缓存
          * 
+         * @param file_name
          * @param time_stamp 
          * @param inserted_tuples 
          * @return std::unique_ptr<SSTable> 
          */
-        static std::unique_ptr<SSTable> NewSSTable(uint64_t time_stamp, const std::vector<KeyOffsetVlenTuple> &inserted_tuples);
+        static std::unique_ptr<SSTable> NewSSTable(const std::string &file_name, uint64_t time_stamp, const std::vector<KeyOffsetVlenTuple> &inserted_tuples);
     
     private:
         SSTable() = default;
@@ -90,12 +91,22 @@ namespace ss_table
 
         const Header &header() const;
         const std::vector<KeyOffsetVlenTuple> &key_offset_vlen_tuple_list() const;
+        const std::string &file_name() const;
+
+        /**
+         * @brief 生成SSTable文件名
+         * 
+         * @param dir 基准路径，如"data"
+         * @param level 层数，如"0"
+         * @param base_name 不包含路径，包含后缀的文件名，如"1.sst"
+         * @return std::string 
+         */
+        static std::string build_file_name(const std::string &dir, int level, const std::string &base_name);
 
         /**
          * @brief 将当前SSTable状态写入文件
-         * @param file_name 文件名
          */
-        void WriteToFile(const std::string &file_name) const;
+        void WriteToFile() const;
 
         /**
          * @brief 在SSTable中查找键
@@ -111,6 +122,7 @@ namespace ss_table
         Header header_;
         bloom_filter::BloomFilter *bloom_filter_ = nullptr;
         std::vector<KeyOffsetVlenTuple> key_offset_vlen_tuple_list_;
+        std::string file_name_;
     };
 }
 

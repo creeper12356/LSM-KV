@@ -75,7 +75,13 @@ void KVStore::put(uint64_t key, const std::string &s)
                      max_key = std::numeric_limits<uint64_t>::min();
 
             for(const auto &level_0_ss_table_file_name: level_0_ss_table_file_list) {
-                std::unique_ptr<ss_table::SSTable> ss_table = ss_table::SSTable::FromFile(dir_ + "/level-0/" + level_0_ss_table_file_name);
+                std::unique_ptr<ss_table::SSTable> ss_table = 
+                    ss_table::SSTable::FromFile(ss_table::SSTable::build_file_name(
+                        dir_, 
+                        0, 
+                        level_0_ss_table_file_name
+                    )
+                );
                 if(!ss_table.get()) {
                     continue;
                 }
@@ -107,7 +113,12 @@ void KVStore::put(uint64_t key, const std::string &s)
             auto merged_time_stamped_tuple_list = ss_table::SSTable::MergeSSTables(ss_table_list);
             ss_table_count_ -= ss_table_list.size();
             // 刪除旧的SSTable文件
-            // TODO
+            for(const auto &ss_table: ss_table_list) {
+                int rmfile_res = utils::rmfile(ss_table.get()->file_name());
+                if(rmfile_res < 0) {
+                    LOG_WARNING("Failed to remove file: %s", ss_table.get()->file_name().c_str());
+                }
+            }
 
             // 每16kB分成一个新的SSTable文件
             uint64_t merged_time_stamped_tuple_count = merged_time_stamped_tuple_list.size();
@@ -129,13 +140,20 @@ void KVStore::put(uint64_t key, const std::string &s)
                     max_time_stamp = time_stamped_tuple.time_stamp > max_time_stamp ? time_stamped_tuple.time_stamp : max_time_stamp;
                     inserted_tuples.push_back(time_stamped_tuple.key_offset_vlen_tuple);
                 }
-
-                auto ss_table = ss_table::SSTable::NewSSTable(max_time_stamp, inserted_tuples);
-
+                
                 // 将SSTable写入文件
-                std::stringstream stream;
-                stream << dir_ << "/level-1/" << ss_table_count_ << ".sst";
-                ss_table.get()->WriteToFile(stream.str());
+                ++ ss_table_count_;
+                auto ss_table = ss_table::SSTable::NewSSTable(
+                    ss_table::SSTable::build_file_name(
+                        dir_, 
+                        1, 
+                        std::to_string(ss_table_count_) + ".sst"
+                    ), 
+                    max_time_stamp, 
+                    inserted_tuples
+                );
+                ss_table.get()->WriteToFile();
+
             }
         }
     }
@@ -158,16 +176,22 @@ std::string KVStore::get(uint64_t key)
         return mem_table_get_result;
     }
 
-    // 从SSTable中查找
+    // 从SSTable的level-0中查找
     std::vector<std::string> ss_table_file_name_list;
-    utils::scanDir("data/level-0", ss_table_file_name_list);
+    utils::scanDir(dir_ + "/level-0", ss_table_file_name_list);
 
     std::unique_ptr<ss_table::SSTable> ss_table;
     uint64_t latest_time_stamp = 0;
     std::string result;
     for (const auto &ss_table_file_name : ss_table_file_name_list)
     {
-        ss_table = ss_table::SSTable::FromFile(dir_ + "/level-0/" + ss_table_file_name);
+        ss_table = ss_table::SSTable::FromFile(
+            ss_table::SSTable::build_file_name(
+                dir_, 
+                0, 
+                ss_table_file_name
+            )
+        );
         if(!ss_table.get()) {
             continue;
         }
@@ -208,12 +232,12 @@ void KVStore::reset()
 {
     mem_table_->Reset();
 
-    // 删除data/level-0目录下的所有文件
+    // 删除data下的所有文件
     std::vector<std::string> ss_table_file_name_list;
-    utils::scanDir("data/level-0", ss_table_file_name_list);
+    utils::scanDir("data/", ss_table_file_name_list);
     for (const auto &ss_table_file_name : ss_table_file_name_list)
     {
-        utils::rmfile("data/level-0/" + ss_table_file_name);
+        utils::rmfile("data/" + ss_table_file_name);
     }
 }
 
@@ -259,10 +283,16 @@ void KVStore::ConvertMemTableToSSTable()
         }
     }
 
-    auto ss_table = ss_table::SSTable::NewSSTable(++ss_table_count_, inserted_tuples);
-
     // 将SSTable写入文件
-    std::stringstream stream;
-    stream << dir_ << "/level-0/" << ss_table_count_ << ".sst";
-    ss_table.get()->WriteToFile(stream.str());
+    ++ ss_table_count_;
+    auto ss_table = ss_table::SSTable::NewSSTable(
+        ss_table::SSTable::build_file_name(
+            dir_, 
+            0, 
+            std::to_string(ss_table_count_) + ".sst"
+        ), 
+        ss_table_count_, 
+        inserted_tuples
+    );
+    ss_table.get()->WriteToFile();
 }
