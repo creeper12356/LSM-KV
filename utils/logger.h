@@ -8,7 +8,7 @@
  */
 #define LOG_INFO(...) Logger::info(__PRETTY_FUNCTION__, __VA_ARGS__)
 #define LOG_ERROR(...) Logger::error(__PRETTY_FUNCTION__, __VA_ARGS__)
-#define LOG_WARNING(...) Logger::WARNING(__PRETTY_FUNCTION__, __VA_ARGS__)
+#define LOG_WARNING(...) Logger::warning(__PRETTY_FUNCTION__, __VA_ARGS__)
 /**
  * @brief 日志类
  * 

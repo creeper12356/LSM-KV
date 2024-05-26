@@ -10,6 +10,7 @@
 #include <iostream>
 #include <fstream>
 #include <limits>
+#include <vector>
 
 namespace ss_table {
     std::unique_ptr<SSTable> SSTable::FromFile(const std::string &file_name)
@@ -112,6 +113,14 @@ namespace ss_table {
 
     const Header &SSTable::header() const {
         return header_;
+    }
+    const std::vector<KeyOffsetVlenTuple> &SSTable::key_offset_vlen_tuple_list() const {
+        return key_offset_vlen_tuple_list_;
+    }
+
+    std::vector<KeyOffsetVlenTuple> SSTable::MergeSSTables(const std::vector<SSTable *> &ss_table_list) {
+        // TODO
+        return std::vector<KeyOffsetVlenTuple> ();
     }
 
 

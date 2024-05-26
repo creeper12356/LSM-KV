@@ -11,16 +11,39 @@
 #include <string>
 #include <sstream>
 #include <memory>
+#include <limits>
 
 KVStore::KVStore(const std::string &dir, const std::string &vlog)
     : KVStoreAPI(dir, vlog), dir_(dir), ss_table_count_(0)
 {
+    LOG_INFO("KVStore is created");
+
+    std::vector<std::string> data_dir_entry_list;
+    utils::scanDir(this->dir_, data_dir_entry_list);
+
+    LOG_INFO("Check SSTable files begins");
+    int level = 0;
+    while(std::find(data_dir_entry_list.begin(), data_dir_entry_list.end(), "level-" + std::to_string(level)) != data_dir_entry_list.end()) {
+        std::vector<std::string> ss_table_file_name_list;
+        utils::scanDir(this->dir_ + "/level-" + std::to_string(level), ss_table_file_name_list);
+        for (const auto &ss_table_file_name : ss_table_file_name_list)
+        {
+            if(!ss_table_file_name.ends_with(".sst")) {
+                LOG_WARNING("Invalid file in level-%d: %s found", level, ss_table_file_name);
+            }
+        }
+        ++level;
+    }
+    LOG_INFO("Check SSTable files complete");
+    LOG_INFO("%d SSTable level(s) detected", level);
+
     mem_table_ = new skip_list::SkipList;
     v_log_ = new v_log::VLog(vlog);
 }
 
 KVStore::~KVStore()
 {
+    LOG_INFO("KVStore is destroyed");
     delete mem_table_;
     delete v_log_;
 }
@@ -34,8 +57,59 @@ void KVStore::put(uint64_t key, const std::string &s)
     mem_table_->Put(key, s);
     if (mem_table_->size() == MEM_TABLE_CAPACITY)
     {
+        // 将所有跳表数据写入level 0 SSTable文件
         ConvertMemTableToSSTable();
         mem_table_->Reset();
+
+        // TODO: compaction in sstable
+        if(!utils::dirExists(dir_ + "/level-0")) {
+            utils::mkdir(dir_ + "/level-0");
+        }
+        std::vector<std::string> level_0_ss_table_file_list;
+        utils::scanDir(dir_ + "/level-0", level_0_ss_table_file_list);
+        if(level_0_ss_table_file_list.size() > 2) {
+            // level 0 SSTable文件数量大于2，进行合并
+            LOG_INFO("Compaction begins");
+            std::vector<std::unique_ptr<ss_table::SSTable>>ss_table_list;
+
+            uint64_t min_key = std::numeric_limits<uint64_t>::max(), 
+                     max_key = std::numeric_limits<uint64_t>::min();
+
+            for(const auto &level_0_ss_table_file_name: level_0_ss_table_file_list) {
+                std::unique_ptr<ss_table::SSTable> ss_table = ss_table::SSTable::FromFile(dir_ + "/level-0/" + level_0_ss_table_file_name);
+                if(!ss_table.get()) {
+                    continue;
+                }
+                min_key = ss_table.get()->header().min_key < min_key ? ss_table.get()->header().min_key : min_key;
+                max_key = ss_table->header().max_key > max_key ? ss_table->header().max_key : max_key;
+                ss_table_list.push_back(std::move(ss_table));
+            }
+
+            if(!utils::dirExists(dir_ + "/level-1")) {
+                utils::mkdir(dir_ + "/level-1");
+            }
+            std::vector<std::string> level_1_ss_table_file_list;
+            utils::scanDir(dir_ + "/level-1", level_1_ss_table_file_list);
+            for(const auto &level_1_ss_table_file_name: level_1_ss_table_file_list) {
+                std::unique_ptr<ss_table::SSTable> ss_table = ss_table::SSTable::FromFile(dir_ + "/level-1" + level_1_ss_table_file_name);
+                if(!ss_table.get()) {
+                    continue;
+                }
+                if(ss_table.get()->header().max_key < min_key || ss_table.get()->header().min_key > max_key) {
+                    // SSTable 区间与[min_key, max_key]无交集
+                    continue;
+                }
+
+                // SSTable区间与[min_key, max_key]有交集 
+                ss_table_list.push_back(std::move(ss_table));
+            }
+
+            // 使用归并排序，将ss_table_list中的SSTable合并
+            // auto merged_key_offset_vlen_tuple_list = ss_table::SSTable::MergeSSTables(ss_table_list);
+
+            // 每16kB分成一个新的SSTable文件
+
+        }
     }
 }
 /**
@@ -66,7 +140,7 @@ std::string KVStore::get(uint64_t key)
     for (const auto &ss_table_file_name : ss_table_file_name_list)
     {
         ss_table = ss_table::SSTable::FromFile(dir_ + "/level-0/" + ss_table_file_name);
-        if(!ss_table) {
+        if(!ss_table.get()) {
             continue;
         }
 

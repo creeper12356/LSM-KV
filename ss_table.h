@@ -84,6 +84,7 @@ namespace ss_table
         void set_header(uint64_t time_stamp, uint64_t key_count, uint64_t min_key, uint64_t max_key);
 
         const Header &header() const;
+        const std::vector<KeyOffsetVlenTuple> &key_offset_vlen_tuple_list() const;
 
         /**
          * @brief 将当前SSTable状态写入文件
@@ -98,6 +99,8 @@ namespace ss_table
          * @return std::optional<SSTableGetResult> 查找结果，当查找成功时返回查找结果，否则返回std::nullopt
          */
         std::optional<SSTableGetResult> Get(uint64_t key) const;
+
+        static std::vector<KeyOffsetVlenTuple> MergeSSTables(const std::vector<SSTable *> &ss_table_list);
 
     private:
         Header header_;
