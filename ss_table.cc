@@ -177,7 +177,7 @@ namespace ss_table {
     }
 
     int SSTable::SSTableMaxCountAtLevel(int level) {
-        return 1 << level;
+        return 2 << level;
     }
 
 
