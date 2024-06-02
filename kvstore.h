@@ -46,6 +46,5 @@ private:
 private:
 	std::string dir_;
 	skip_list::SkipList *mem_table_;
-	uint64_t ss_table_count_;
 	v_log::VLog *v_log_;
 };

@@ -114,6 +114,16 @@ namespace ss_table
          * @return std::string 如"data/level-0"
          */
         static std::string BuildSSTableDirName(const std::string &dir, int level);
+
+
+        /**
+         * @brief 生成唯一的SSTable文件名
+         * 
+         * @param dir 基准路径
+         * @param level 层数
+         * @return std::string 如"data/level-0/17000000.sst"
+         */
+        static std::string BuildUniqueSSTableFileName(const std::string &dir, int level);
         /**
          * @brief 将当前SSTable状态写入文件
          */

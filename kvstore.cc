@@ -13,9 +13,10 @@
 #include <memory>
 #include <limits>
 #include <algorithm>
+#include <chrono>
 
 KVStore::KVStore(const std::string &dir, const std::string &vlog)
-    : KVStoreAPI(dir, vlog), dir_(dir), ss_table_count_(0)
+    : KVStoreAPI(dir, vlog), dir_(dir)
 {
     LOG_INFO("KVStore is created");
 
@@ -111,7 +112,6 @@ void KVStore::put(uint64_t key, const std::string &s)
                 ss_table_list.push_back(std::move(ss_table));
             }
 
-            ss_table_count_ -= ss_table_list.size();
             // 刪除旧的SSTable文件
             for(const auto &ss_table: ss_table_list) {
                 int rmfile_res = utils::rmfile(ss_table->file_name());
@@ -124,7 +124,6 @@ void KVStore::put(uint64_t key, const std::string &s)
             auto merged_time_stamped_tuple_list = ss_table::SSTable::MergeSSTables(ss_table_list);
             // 每16kB分成一个新的SSTable文件
             uint64_t merged_time_stamped_tuple_count = merged_time_stamped_tuple_list.size();
-            LOG_INFO("Merged tuple count: %d", merged_time_stamped_tuple_count);
             for(uint64_t i = 0;i < merged_time_stamped_tuple_count; i += MEM_TABLE_CAPACITY) {
                 // 判断是不是最后一组
                 int sublist_size = 
@@ -145,13 +144,11 @@ void KVStore::put(uint64_t key, const std::string &s)
                 }
                 
                 // 将SSTable写入文件
-                ++ ss_table_count_;
                 auto ss_table = ss_table::SSTable::NewSSTable(
-                    ss_table::SSTable::BuildSSTableFileName(
-                        dir_, 
-                        1, 
-                        std::to_string(ss_table_count_) + ".sst"
-                    ), 
+                    ss_table::SSTable::BuildUniqueSSTableFileName(
+                        dir_,
+                        1
+                    ),
                     max_time_stamp, 
                     inserted_tuples
                 );
@@ -268,14 +265,12 @@ void KVStore::ConvertMemTableToSSTable()
     }
 
     // 将SSTable写入文件
-    ++ ss_table_count_;
     auto ss_table = ss_table::SSTable::NewSSTable(
-        ss_table::SSTable::BuildSSTableFileName(
+        ss_table::SSTable::BuildUniqueSSTableFileName(
             dir_, 
-            0, 
-            std::to_string(ss_table_count_) + ".sst"
-        ), 
-        ss_table_count_, 
+            0
+        ),
+        std::chrono::system_clock::now().time_since_epoch().count(),
         inserted_tuples
     );
     ss_table->WriteToFile();
