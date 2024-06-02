@@ -56,6 +56,10 @@ namespace ss_table
         TimeStampedKeyOffsetVlenTuple(uint64_t time_stamp, const KeyOffsetVlenTuple &key_offset_vlen_tuple)
             : time_stamp(time_stamp), key_offset_vlen_tuple(key_offset_vlen_tuple) { }
     };
+    struct SSTableMetaData {
+        Header header;
+        std::string ss_table_file_name;
+    };
     class SSTable
     {
     public:
@@ -139,7 +143,7 @@ namespace ss_table
 
 
         static std::vector<TimeStampedKeyOffsetVlenTuple> MergeSSTables(const std::vector<std::unique_ptr<SSTable>> &ss_table_list);
-
+        static Header ReadSSTableHeaderDirectly(const std::string &full_ss_table_file_name);
     private:
         Header header_;
         bloom_filter::BloomFilter *bloom_filter_ = nullptr;

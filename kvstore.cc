@@ -66,34 +66,30 @@ void KVStore::put(uint64_t key, const std::string &s)
         if(!utils::dirExists(dir_ + "/level-0")) {
             utils::mkdir(dir_ + "/level-0");
         }
-        std::vector<std::string> level_0_ss_table_file_list;
-        utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, 0), level_0_ss_table_file_list);
+
+        std::vector<std::string> level_0_ss_table_file_name_list;
+        utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, 0), level_0_ss_table_file_name_list);
         
         
-        if(level_0_ss_table_file_list.size() > 2) {
+        if(level_0_ss_table_file_name_list.size() > 2) {
             // level 0 SSTable文件数量大于2，进行合并
-
-            // 将SSTable文件读入内存
-            std::vector<std::unique_ptr<ss_table::SSTable>>ss_table_list;
-            uint64_t min_key = std::numeric_limits<uint64_t>::max(), 
-                     max_key = std::numeric_limits<uint64_t>::min();
-            LoadSSTablesToMemory(level_0_ss_table_file_list, 0,
-                                ss_table_list, min_key, max_key);
-            LoadSSTablesInRangeToMemory(1, min_key, max_key, ss_table_list);
-
-            // 刪除旧的SSTable文件
-            std::vector<std::string> deleted_ss_table_file_name_list;
-            for(const auto &ss_table: ss_table_list) {
-                deleted_ss_table_file_name_list.push_back(ss_table->file_name());
-            }
-            if(utils::rmfiles(deleted_ss_table_file_name_list) < 0) {
-                LOG_WARNING("Failed to remove old SSTable files");
-            }
-
-            // 合并SSTable文件, 并将合并后的SSTable文件写入磁盘
-            auto merged_time_stamped_tuple_list = ss_table::SSTable::MergeSSTables(ss_table_list);
-            StoreSSTableToDisk(1, merged_time_stamped_tuple_list);
+            DoCompaction(level_0_ss_table_file_name_list, 0, 1);
         }
+
+        std::vector<std::string> level_1_ss_table_file_name_list;
+        utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, 1), level_1_ss_table_file_name_list);
+        if(level_1_ss_table_file_name_list.size() > 4) {
+            // level 1 SSTable文件数量大于4，进行合并
+            std::vector<std::string> compacted_ss_table_file_name_list;
+            FilterSSTableFiles(
+                level_1_ss_table_file_name_list, 
+                1, level_1_ss_table_file_name_list.size() - 4, 
+                compacted_ss_table_file_name_list
+            );
+            DoCompaction(compacted_ss_table_file_name_list, 1, 2);
+        }
+
+
     }
 }
 /**
@@ -114,12 +110,19 @@ std::string KVStore::get(uint64_t key)
         return mem_table_get_result;
     }
 
-    // 从SSTable的level-0中查找
-    std::string result = get_in_level(key, 0);
-    if(!result.empty()) {
-        return result;
+    // 从SSTable逐层查找
+    int level = 0;
+    std::string result;
+    while (utils::dirExists(ss_table::SSTable::BuildSSTableDirName(dir_, level)))
+    {
+        result = get_in_level(key, level);
+        if(!result.empty()) {
+            return result;
+        }
+        ++ level;
     }
-    return get_in_level(key, 1);
+
+    return result;
 }
 /**
  * Delete the given key-value pair if it exists.
@@ -344,4 +347,60 @@ std::string KVStore::get_in_level(uint64_t key, int level) {
         }
     }
     return result;
+}
+
+void KVStore::DoCompaction(
+    const std::vector<std::string> ss_table_base_file_name_list, 
+    int fromLevel,
+    int toLevel
+) {
+    // 将SSTable文件读入内存
+    std::vector<std::unique_ptr<ss_table::SSTable>>ss_table_list;
+    uint64_t min_key = std::numeric_limits<uint64_t>::max(), 
+                max_key = std::numeric_limits<uint64_t>::min();
+    LoadSSTablesToMemory(ss_table_base_file_name_list, fromLevel,
+                        ss_table_list, min_key, max_key);
+    LoadSSTablesInRangeToMemory(toLevel, min_key, max_key, ss_table_list);
+
+    // 刪除旧的SSTable文件
+    std::vector<std::string> deleted_ss_table_file_name_list;
+    for(const auto &ss_table: ss_table_list) {
+        // 此处ss_table-> file_name()为完整路径
+        deleted_ss_table_file_name_list.push_back(ss_table->file_name());
+    }
+    if(utils::rmfiles(deleted_ss_table_file_name_list) < 0) {
+        LOG_WARNING("Failed to remove old SSTable files");
+    }
+
+    // 合并SSTable文件, 并将合并后的SSTable文件写入磁盘
+    auto merged_time_stamped_tuple_list = ss_table::SSTable::MergeSSTables(ss_table_list);
+    StoreSSTableToDisk(toLevel, merged_time_stamped_tuple_list);
+}
+
+void KVStore::FilterSSTableFiles(
+    const std::vector<std::string> &ss_table_base_file_name_list,
+    int level,
+    int filter_size,
+    std::vector<std::string> &filtered_ss_table_base_file_name_list
+) {
+    std::vector<ss_table::SSTableMetaData> ss_table_meta_data_list;
+    for(const auto &ss_table_file_name: ss_table_base_file_name_list) {
+        ss_table_meta_data_list.push_back({
+            ss_table::SSTable::ReadSSTableHeaderDirectly(
+                ss_table::SSTable::BuildSSTableFileName(dir_, level, ss_table_file_name)
+            ),
+            ss_table_file_name
+        });
+    }
+
+    // TODO: 修改比较函数
+    std::sort(ss_table_meta_data_list.begin(), ss_table_meta_data_list.end(),
+        [](const ss_table::SSTableMetaData &a, const ss_table::SSTableMetaData &b) {
+            return a.header.time_stamp < b.header.time_stamp;
+        }
+    );
+    
+    for(int i = 0; i < filter_size; ++i) {
+        filtered_ss_table_base_file_name_list.push_back(ss_table_meta_data_list[i].ss_table_file_name);
+    }
 }

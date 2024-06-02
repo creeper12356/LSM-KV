@@ -93,6 +93,34 @@ private:
 		const std::vector<ss_table::TimeStampedKeyOffsetVlenTuple> &tuples
 	);
 
+	/**
+	 * @brief 执行合并操作
+	 * 
+	 * @param ss_table_base_file_name_list 需要合并的SSTable文件名列表（不是完整路径）
+	 * @param fromLevel 合并的SSTable所在的层级
+	 * @param toLevel 合并后的SSTable所在的层级
+	 */
+	void DoCompaction(
+		const std::vector<std::string> ss_table_base_file_name_list,
+		 int fromLevel,
+		 int toLevel
+	);
+
+	/**
+	 * @brief 从level层过滤出时间戳最小的filter_size个SSTable文件
+	 * 
+	 * @param ss_table_file_name_list 候选的SSTable文件名列表
+	 * @param level 层数
+	 * @param filter_size 需要过滤出的SSTable文件个数 
+	 * @param filtered_ss_table_file_name_list 过滤后的SSTable文件名列表 
+	 */
+	void FilterSSTableFiles(
+		const std::vector<std::string> &ss_table_base_file_name_list,
+		int level,
+		int filter_size,
+		std::vector<std::string> &filtered_ss_table_base_file_name_list
+	);
+
 
 
 	std::string get_in_level(uint64_t key, int level);
