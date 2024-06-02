@@ -52,6 +52,9 @@ namespace ss_table
     {
         uint64_t time_stamp;
         KeyOffsetVlenTuple key_offset_vlen_tuple;
+
+        TimeStampedKeyOffsetVlenTuple(uint64_t time_stamp, const KeyOffsetVlenTuple &key_offset_vlen_tuple)
+            : time_stamp(time_stamp), key_offset_vlen_tuple(key_offset_vlen_tuple) { }
     };
     class SSTable
     {
@@ -99,10 +102,18 @@ namespace ss_table
          * @param dir 基准路径，如"data"
          * @param level 层数，如"0"
          * @param base_name 不包含路径，包含后缀的文件名，如"1.sst"
-         * @return std::string 
+         * @return std::string 如"data/level-0/1.sst"
          */
-        static std::string build_file_name(const std::string &dir, int level, const std::string &base_name);
-
+        static std::string BuildSSTableFileName(const std::string &dir, int level, const std::string &base_name);
+        
+        /**
+         * @brief 生成SSTable目录名
+         * 
+         * @param dir 基准路径，如"data"
+         * @param level 层数，如"0"
+         * @return std::string 如"data/level-0"
+         */
+        static std::string BuildSSTableDirName(const std::string &dir, int level);
         /**
          * @brief 将当前SSTable状态写入文件
          */

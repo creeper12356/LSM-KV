@@ -123,7 +123,9 @@ namespace ss_table {
         return file_name_;
     }
 
-    std::vector<TimeStampedKeyOffsetVlenTuple> SSTable::MergeSSTables(const std::vector<std::unique_ptr<SSTable>> &ss_table_list) {
+    std::vector<TimeStampedKeyOffsetVlenTuple> SSTable::MergeSSTables(
+        const std::vector<std::unique_ptr<SSTable>> &ss_table_list
+    ) {
         auto cmp = [](const TimeStampedKeyOffsetVlenTuple &a, const TimeStampedKeyOffsetVlenTuple &b) {
             return a.key_offset_vlen_tuple.key < b.key_offset_vlen_tuple.key 
                     || (a.key_offset_vlen_tuple.key == b.key_offset_vlen_tuple.key && a.time_stamp > b.time_stamp);
@@ -136,7 +138,7 @@ namespace ss_table {
 
         for(const auto &ss_table: ss_table_list) {
             for(const auto &tuple: ss_table->key_offset_vlen_tuple_list()) {
-                pq.push({ss_table->header().time_stamp, tuple});
+                pq.emplace(ss_table->header().time_stamp, tuple);
             }
         }
 
@@ -157,8 +159,11 @@ namespace ss_table {
 
 
 
-    std::string SSTable::build_file_name(const std::string &dir, int level, const std::string &base_name) {
+    std::string SSTable::BuildSSTableFileName(const std::string &dir, int level, const std::string &base_name) {
         return dir + "/level-" + std::to_string(level) + "/" + base_name;
+    }
+    std::string SSTable::BuildSSTableDirName(const std::string &dir, int level) {
+        return dir + "/level-" + std::to_string(level);
     }
 
 
