@@ -104,6 +104,23 @@ namespace utils
     {
         return ::unlink(path.c_str());
     }
+    
+    /**
+     * Delete files
+     * @param files files to be deleted.
+     * @return 0 if delete successfully, -1 otherwise.
+     */
+    static inline int rmfiles(const std::vector<std::string> &files)
+    {
+        for (const auto &file : files)
+        {
+            if (rmfile(file) != 0)
+            {
+                return -1;
+            }
+        }
+        return 0;
+    }
 
     /**
      * Reclaim space of a file

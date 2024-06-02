@@ -124,6 +124,7 @@ namespace ss_table {
         return file_name_;
     }
 
+
     std::vector<TimeStampedKeyOffsetVlenTuple> SSTable::MergeSSTables(
         const std::vector<std::unique_ptr<SSTable>> &ss_table_list
     ) {

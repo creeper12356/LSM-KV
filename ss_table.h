@@ -137,6 +137,7 @@ namespace ss_table
          */
         std::optional<SSTableGetResult> Get(uint64_t key) const;
 
+
         static std::vector<TimeStampedKeyOffsetVlenTuple> MergeSSTables(const std::vector<std::unique_ptr<SSTable>> &ss_table_list);
 
     private:

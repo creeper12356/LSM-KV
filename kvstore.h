@@ -1,6 +1,10 @@
 #pragma once
 
 #include "kvstore_api.h"
+#include <vector>
+#include <memory>
+#include <string>
+#include <list>
 
 namespace skip_list
 {
@@ -9,6 +13,11 @@ namespace skip_list
 namespace v_log
 {
 	class VLog;
+}
+namespace ss_table
+{
+	class SSTable;
+	struct TimeStampedKeyOffsetVlenTuple;
 }
 class KVStore : public KVStoreAPI
 {
@@ -41,7 +50,53 @@ private:
 	 */
 	void ConvertMemTableToSSTable();
 
+	/**
+	 * @brief 将SSTable文件加载到内存
+	 * 
+	 * @param ss_table_file_name_list 需要加载的SSTable文件名列表（不是完整路径）
+	 * @param level 加载的SSTable所在的层级
+	 * @param ss_table_list 将所有加载的SSTable追加到该列表中
+	 * @param min_key 加载后的SSTable中的最小key
+	 * @param max_key 加载后的SSTable中的最大key
+	 */
+	void LoadSSTablesToMemory(
+		const std::vector<std::string> &ss_table_file_name_list, 
+		int level,
+		std::vector<std::unique_ptr<ss_table::SSTable>> &ss_table_list,
+		uint64_t &min_key,
+		uint64_t &max_key
+	);
+
+	/**
+	 * @brief 将指定范围内的SSTable文件加载到内存
+	 * 
+	 * @param level 加载的SSTable所在的层级
+	 * @param min_key 最小key
+	 * @param max_key 最大key
+	 * @param ss_table_list 将所有加载的SSTable追加到该列表中
+	 */
+	void LoadSSTablesInRangeToMemory(
+		int level,
+		uint64_t min_key, 
+		uint64_t max_key,
+		std::vector<std::unique_ptr<ss_table::SSTable>> &ss_table_list
+	);
+
+	/**
+	 * @brief 从tuples生产新的SSTable文件，写入第level层
+	 * 
+	 * @param level 层数
+	 * @param tuples 合并后得到的带有时间戳的KeyOffsetVlen元组 
+	 */
+	void StoreSSTableToDisk(
+		int level,
+		const std::vector<ss_table::TimeStampedKeyOffsetVlenTuple> &tuples
+	);
+
+
+
 	std::string get_in_level(uint64_t key, int level);
+
 
 private:
 	std::string dir_;
