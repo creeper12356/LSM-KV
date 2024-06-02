@@ -130,62 +130,34 @@ namespace ss_table {
         auto cmp = [](const TimeStampedKeyOffsetVlenTuple &a, const TimeStampedKeyOffsetVlenTuple &b) {
         return a.key_offset_vlen_tuple.key > b.key_offset_vlen_tuple.key 
                || (a.key_offset_vlen_tuple.key == b.key_offset_vlen_tuple.key && a.time_stamp < b.time_stamp);
-    };
-    std::priority_queue<
-        TimeStampedKeyOffsetVlenTuple,
-        std::vector<TimeStampedKeyOffsetVlenTuple>,
-        decltype(cmp)
-    > pq(cmp);
+        };
+        std::priority_queue<
+            TimeStampedKeyOffsetVlenTuple,
+            std::vector<TimeStampedKeyOffsetVlenTuple>,
+            decltype(cmp)
+        > pq(cmp);
 
-    for (const auto &ss_table : ss_table_list) {
-        for (const auto &tuple : ss_table->key_offset_vlen_tuple_list()) {
-            pq.emplace(ss_table->header().time_stamp, tuple);
+
+        for (const auto &ss_table : ss_table_list) {
+            for (const auto &tuple : ss_table->key_offset_vlen_tuple_list()) {
+                pq.emplace(ss_table->header().time_stamp, tuple);
+            }
         }
-    }
 
-    std::vector<TimeStampedKeyOffsetVlenTuple> merged_results;
-    while (!pq.empty()) {
-        auto current = pq.top();
-        pq.pop();
-
-        while (!pq.empty() && pq.top().key_offset_vlen_tuple.key == current.key_offset_vlen_tuple.key) {
-            current = pq.top();
+        std::vector<TimeStampedKeyOffsetVlenTuple> merged_results;
+        while (!pq.empty()) {
+            auto current = pq.top();
             pq.pop();
+
+            while (!pq.empty() && pq.top().key_offset_vlen_tuple.key == current.key_offset_vlen_tuple.key) {
+                current = pq.top();
+                pq.pop();
+            }
+
+            merged_results.push_back(current);
         }
 
-        merged_results.push_back(current);
-    }
-
-    return merged_results;
-        // auto cmp = [](const TimeStampedKeyOffsetVlenTuple &a, const TimeStampedKeyOffsetVlenTuple &b) {
-        //     return a.key_offset_vlen_tuple.key < b.key_offset_vlen_tuple.key 
-        //             || (a.key_offset_vlen_tuple.key == b.key_offset_vlen_tuple.key && a.time_stamp > b.time_stamp);
-        // };
-        // std::priority_queue<
-        //     TimeStampedKeyOffsetVlenTuple,
-        //     std::vector<TimeStampedKeyOffsetVlenTuple>,
-        //     decltype(cmp)
-        // > pq(cmp);
-
-        // for(const auto &ss_table: ss_table_list) {
-        //     for(const auto &tuple: ss_table->key_offset_vlen_tuple_list()) {
-        //         pq.emplace(ss_table->header().time_stamp, tuple);
-        //     }
-        // }
-
-        // std::vector<TimeStampedKeyOffsetVlenTuple> merged_results;
-        // while(!pq.empty()) {
-        //     if(!merged_results.empty() && pq.top().key_offset_vlen_tuple.key == merged_results.back().key_offset_vlen_tuple.key) {
-        //         // 时间戳相等时，取最大的时间戳
-        //         pq.pop();
-        //         continue;
-        //     }
-
-        //     merged_results.push_back(pq.top());
-        //     pq.pop();
-        // }
-
-        // return merged_results;
+        return merged_results;
     }
 
 
