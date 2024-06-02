@@ -63,33 +63,26 @@ void KVStore::put(uint64_t key, const std::string &s)
         ConvertMemTableToSSTable();
         mem_table_->Reset();
 
-        if(!utils::dirExists(dir_ + "/level-0")) {
-            utils::mkdir(dir_ + "/level-0");
-        }
+        int level = 0;
+        while(CheckSSTableLevelOverflow(level)) {
+            std::vector<std::string> ss_table_base_file_name_list;
+            utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, level), ss_table_base_file_name_list);
+            if(level == 0) {
+                DoCompaction(ss_table_base_file_name_list, level, level + 1);
+                ++ level;
+                continue;
+            }
 
-        std::vector<std::string> level_0_ss_table_file_name_list;
-        utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, 0), level_0_ss_table_file_name_list);
-        
-        
-        if(level_0_ss_table_file_name_list.size() > 2) {
-            // level 0 SSTable文件数量大于2，进行合并
-            DoCompaction(level_0_ss_table_file_name_list, 0, 1);
-        }
-
-        std::vector<std::string> level_1_ss_table_file_name_list;
-        utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, 1), level_1_ss_table_file_name_list);
-        if(level_1_ss_table_file_name_list.size() > 4) {
-            // level 1 SSTable文件数量大于4，进行合并
-            std::vector<std::string> compacted_ss_table_file_name_list;
+            std::vector<std::string> compacted_ss_table_base_file_name_list;
             FilterSSTableFiles(
-                level_1_ss_table_file_name_list, 
-                1, level_1_ss_table_file_name_list.size() - 4, 
-                compacted_ss_table_file_name_list
+                ss_table_base_file_name_list,
+                level, 
+                ss_table_base_file_name_list.size() - ss_table::SSTable::SSTableMaxCountAtLevel(level),
+                compacted_ss_table_base_file_name_list
             );
-            DoCompaction(compacted_ss_table_file_name_list, 1, 2);
+            DoCompaction(compacted_ss_table_base_file_name_list, level, level + 1);
+            ++ level;
         }
-
-
     }
 }
 /**
@@ -147,21 +140,15 @@ void KVStore::reset()
 {
     mem_table_->Reset();
 
-    // 删除data/level-0下的所有文件
-    std::vector<std::string> ss_table_file_name_list;
-    utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, 0), ss_table_file_name_list);
-    for (const auto &ss_table_file_name : ss_table_file_name_list)
-    {
-        utils::rmfile(ss_table::SSTable::BuildSSTableFileName(dir_, 0, ss_table_file_name));
+    int level = 0;
+    while(utils::dirExists(ss_table::SSTable::BuildSSTableDirName(dir_, level))) {
+        std::vector<std::string> base_file_name_list;
+        utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, level), base_file_name_list);
+        for(const auto &base_file_name: base_file_name_list) {
+            utils::rmfile(ss_table::SSTable::BuildSSTableFileName(dir_, level, base_file_name));
+        }
+        ++level;
     }
-
-    // 删除data/level-1下的所有文件
-    utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, 1), ss_table_file_name_list);
-    for (const auto &ss_table_file_name : ss_table_file_name_list)
-    {
-        utils::rmfile(ss_table::SSTable::BuildSSTableFileName(dir_, 1, ss_table_file_name));
-    }
-
 }
 
 /**
@@ -403,4 +390,15 @@ void KVStore::FilterSSTableFiles(
     for(int i = 0; i < filter_size; ++i) {
         filtered_ss_table_base_file_name_list.push_back(ss_table_meta_data_list[i].ss_table_file_name);
     }
+}
+
+
+bool KVStore::CheckSSTableLevelOverflow(int level) const {
+    std::vector<std::string> ss_table_file_name_list;
+    std::string dir = ss_table::SSTable::BuildSSTableDirName(dir_, level);
+    if(!utils::dirExists(dir)) {
+        return false;
+    }
+    utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, level), ss_table_file_name_list);
+    return ss_table_file_name_list.size() > ss_table::SSTable::SSTableMaxCountAtLevel(level);
 }

@@ -176,6 +176,10 @@ namespace ss_table {
         return header;
     }
 
+    int SSTable::SSTableMaxCountAtLevel(int level) {
+        return 1 << level;
+    }
+
 
 
     std::string SSTable::BuildSSTableFileName(const std::string &dir, int level, const std::string &base_name) {

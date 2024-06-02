@@ -121,6 +121,15 @@ private:
 		std::vector<std::string> &filtered_ss_table_base_file_name_list
 	);
 
+	/**
+	 * @brief 判断level层的SSTable文件是否溢出
+	 * 
+	 * @param level 
+	 * @return true 
+	 * @return false 
+	 */
+	bool CheckSSTableLevelOverflow(int level) const;
+
 
 
 	std::string get_in_level(uint64_t key, int level);

@@ -144,6 +144,8 @@ namespace ss_table
 
         static std::vector<TimeStampedKeyOffsetVlenTuple> MergeSSTables(const std::vector<std::unique_ptr<SSTable>> &ss_table_list);
         static Header ReadSSTableHeaderDirectly(const std::string &full_ss_table_file_name);
+        static int SSTableMaxCountAtLevel(int level);
+    
     private:
         Header header_;
         bloom_filter::BloomFilter *bloom_filter_ = nullptr;
