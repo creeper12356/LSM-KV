@@ -161,17 +161,16 @@ namespace ss_table {
         return merged_results;
     }
 
-    Header SSTable::ReadSSTableHeaderDirectly(const std::string &full_ss_table_file_name) {
+    Header SSTable::ReadSSTableHeaderDirectly(const std::string &ss_table_file_name) {
         std::ifstream fin;
-        fin.open(full_ss_table_file_name);
+        fin.open(ss_table_file_name);
         if(!fin) {
-            LOG_ERROR("Read SSTable file `%s` error", full_ss_table_file_name.c_str());
-            return {};
+            LOG_ERROR("Read SSTable file `%s` error", ss_table_file_name.c_str());
+            return {0, 0, 0, 0};
         }
 
         Header header;
-        // TODO: 由于对齐问题，此处读取20字节即可
-        fin.read(reinterpret_cast<char*>(&header), 20);
+        fin.read(reinterpret_cast<char*>(&header), sizeof(Header));
         fin.close();
         return header;
     }

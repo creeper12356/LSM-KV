@@ -305,22 +305,33 @@ void KVStore::StoreSSTableToDisk(
 }
 
 std::string KVStore::get_in_level(uint64_t key, int level) {
-    std::vector<std::string> ss_table_file_name_list;
-    utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, level), ss_table_file_name_list);
+    std::vector<std::string> ss_table_base_file_name_list;
+    utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, level), ss_table_base_file_name_list);
 
     std::unique_ptr<ss_table::SSTable> ss_table;
     uint64_t latest_time_stamp = 0;
     std::string result;
-    for (const auto &ss_table_file_name : ss_table_file_name_list)
+    for (const auto &ss_table_base_file_name : ss_table_base_file_name_list)
     {
-        ss_table = ss_table::SSTable::FromFile(
-            ss_table::SSTable::BuildSSTableFileName(
-                dir_, 
-                level, 
-                ss_table_file_name
-            )
+        auto ss_table_file_name = ss_table::SSTable::BuildSSTableFileName(
+            dir_,
+            level,
+            ss_table_base_file_name
         );
+        auto header = ss_table::SSTable::ReadSSTableHeaderDirectly(ss_table_file_name);
+        if(header.key_count == 0) {
+            // 读取SSTable文件失败
+            continue;
+        }
+        if(key < header.min_key || key > header.max_key) {
+            // key不在SSTable的键范围内
+            continue;
+        }
+
+        // 将整个SSTable文件读入内存
+        ss_table = ss_table::SSTable::FromFile(ss_table_file_name);
         if(!ss_table) {
+            // 读取SSTable文件失败
             continue;
         }
 

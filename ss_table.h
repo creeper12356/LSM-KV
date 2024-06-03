@@ -128,6 +128,8 @@ namespace ss_table
          * @return std::string 如"data/level-0/17000000.sst"
          */
         static std::string BuildUniqueSSTableFileName(const std::string &dir, int level);
+
+
         /**
          * @brief 将当前SSTable状态写入文件
          */
@@ -143,7 +145,21 @@ namespace ss_table
 
 
         static std::vector<TimeStampedKeyOffsetVlenTuple> MergeSSTables(const std::vector<std::unique_ptr<SSTable>> &ss_table_list);
-        static Header ReadSSTableHeaderDirectly(const std::string &full_ss_table_file_name);
+        
+        /**
+         * @brief 直接读取SSTable文件的Header部分
+         * 
+         * @param ss_table_file_name 文件完整路径
+         * @return Header 读取到的Header
+         */
+        static Header ReadSSTableHeaderDirectly(const std::string &ss_table_file_name);
+
+        /**
+         * @brief SSTable第level层最多允许的SSTable数量
+         * 
+         * @param level 层数
+         * @return int 
+         */
         static int SSTableMaxCountAtLevel(int level);
     
     private:
