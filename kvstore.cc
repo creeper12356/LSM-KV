@@ -109,9 +109,15 @@ std::string KVStore::get(uint64_t key)
     while (utils::dirExists(ss_table::SSTable::BuildSSTableDirName(dir_, level)))
     {
         result = get_in_level(key, level);
-        if(!result.empty()) {
+        if(result == DELETED) {
+            // 查找到删除标记
+            return "";
+        }
+        else if(!result.empty()) {
+            // 查找到有效的值
             return result;
         }
+        // 未查找到任何记录，继续查找下一层
         ++ level;
     }
 
@@ -129,6 +135,33 @@ bool KVStore::del(uint64_t key)
     }
 
     mem_table_->Put(key, DELETED);
+    if (mem_table_->size() == MEM_TABLE_CAPACITY)
+    {
+        // 将所有跳表数据写入level 0 SSTable文件
+        ConvertMemTableToSSTable();
+        mem_table_->Reset();
+
+        int level = 0;
+        while(CheckSSTableLevelOverflow(level)) {
+            std::vector<std::string> ss_table_base_file_name_list;
+            utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, level), ss_table_base_file_name_list);
+            if(level == 0) {
+                DoCompaction(ss_table_base_file_name_list, level, level + 1);
+                ++ level;
+                continue;
+            }
+
+            std::vector<std::string> compacted_ss_table_base_file_name_list;
+            FilterSSTableFiles(
+                ss_table_base_file_name_list,
+                level, 
+                ss_table_base_file_name_list.size() - ss_table::SSTable::SSTableMaxCountAtLevel(level),
+                compacted_ss_table_base_file_name_list
+            );
+            DoCompaction(compacted_ss_table_base_file_name_list, level, level + 1);
+            ++ level;
+        }
+    }
     return true;
 }
 
@@ -186,7 +219,7 @@ void KVStore::ConvertMemTableToSSTable()
     uint64_t v_log_offset;  // 写入VLog的偏移量
     for(auto it = mem_table_->begin(); it != mem_table_->end(); ++it) {
         if((*it).val() == DELETED) {
-            inserted_tuples.push_back({(*it).key(), 0, 0});
+            inserted_tuples.emplace_back((*it).key(), 0, 0);
         } else {
             v_log_offset = v_log_->Insert((*it).key(), (*it).val());
             inserted_tuples.emplace_back((*it).key(), v_log_offset, (*it).val().size());
@@ -309,7 +342,7 @@ std::string KVStore::get_in_level(uint64_t key, int level) {
     utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, level), ss_table_base_file_name_list);
 
     std::unique_ptr<ss_table::SSTable> ss_table;
-    uint64_t latest_time_stamp = 0;
+    uint64_t latest_time_stamp = std::numeric_limits<uint64_t>::min();
     std::string result;
     for (const auto &ss_table_base_file_name : ss_table_base_file_name_list)
     {
@@ -338,9 +371,13 @@ std::string KVStore::get_in_level(uint64_t key, int level) {
         auto ss_table_get_res = ss_table->Get(key);
         if (ss_table_get_res.has_value() && ss_table->header().time_stamp > latest_time_stamp)
         {
+            // 找到了一条记录且时间戳更新（找到vlog中的索引或者删除标记）
+            // LOG_INFO("newer key %lu found with time stamp %lu", key, ss_table->header().time_stamp);
+            // LOG_INFO("is deleted: %d", ss_table_get_res.value().vlen == 0);
+            // LOG_INFO("current level is %d", level);
             result = ss_table_get_res.value().vlen ?
                 this->v_log_->Get(ss_table_get_res.value().offset, ss_table_get_res.value().vlen) : 
-                "";
+                DELETED;
             latest_time_stamp = ss_table->header().time_stamp;
         }
     }
@@ -349,16 +386,16 @@ std::string KVStore::get_in_level(uint64_t key, int level) {
 
 void KVStore::DoCompaction(
     const std::vector<std::string> ss_table_base_file_name_list, 
-    int fromLevel,
-    int toLevel
+    int from_level,
+    int to_level
 ) {
     // 将SSTable文件读入内存
     std::vector<std::unique_ptr<ss_table::SSTable>>ss_table_list;
     uint64_t min_key = std::numeric_limits<uint64_t>::max(), 
                 max_key = std::numeric_limits<uint64_t>::min();
-    LoadSSTablesToMemory(ss_table_base_file_name_list, fromLevel,
+    LoadSSTablesToMemory(ss_table_base_file_name_list, from_level,
                         ss_table_list, min_key, max_key);
-    LoadSSTablesInRangeToMemory(toLevel, min_key, max_key, ss_table_list);
+    LoadSSTablesInRangeToMemory(to_level, min_key, max_key, ss_table_list);
 
     // 刪除旧的SSTable文件
     std::vector<std::string> deleted_ss_table_file_name_list;
@@ -372,7 +409,7 @@ void KVStore::DoCompaction(
 
     // 合并SSTable文件, 并将合并后的SSTable文件写入磁盘
     auto merged_time_stamped_tuple_list = ss_table::SSTable::MergeSSTables(ss_table_list);
-    StoreSSTableToDisk(toLevel, merged_time_stamped_tuple_list);
+    StoreSSTableToDisk(to_level, merged_time_stamped_tuple_list);
 }
 
 void KVStore::FilterSSTableFiles(
@@ -391,14 +428,16 @@ void KVStore::FilterSSTableFiles(
         });
     }
 
-    // TODO: 修改比较函数
     std::sort(ss_table_meta_data_list.begin(), ss_table_meta_data_list.end(),
         [](const ss_table::SSTableMetaData &a, const ss_table::SSTableMetaData &b) {
-            return a.header.time_stamp < b.header.time_stamp;
+            // 首先按照时间戳升序排序，然后按照最小键升序排序
+            return a.header.time_stamp < b.header.time_stamp 
+            || (a.header.time_stamp == b.header.time_stamp && a.header.min_key < b.header.min_key);
         }
     );
     
     for(int i = 0; i < filter_size; ++i) {
+        // LOG_INFO("timestamp: %lu", ss_table_meta_data_list[i].header.time_stamp);
         filtered_ss_table_base_file_name_list.push_back(ss_table_meta_data_list[i].ss_table_file_name);
     }
 }

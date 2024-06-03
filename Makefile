@@ -1,6 +1,6 @@
 
 LINK.o = $(LINK.cc)
-CXXFLAGS = -std=c++20 -Wall -g
+CXXFLAGS = -std=c++20 -Wall -g -Ofast
 CC = g++
 
 all: correctness persistence my_correctness

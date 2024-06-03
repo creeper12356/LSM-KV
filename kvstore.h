@@ -97,13 +97,13 @@ private:
 	 * @brief 执行合并操作
 	 * 
 	 * @param ss_table_base_file_name_list 需要合并的SSTable文件名列表（不是完整路径）
-	 * @param fromLevel 合并的SSTable所在的层级
-	 * @param toLevel 合并后的SSTable所在的层级
+	 * @param from_level 合并的SSTable所在的层级
+	 * @param to_level 合并后的SSTable所在的层级
 	 */
 	void DoCompaction(
 		const std::vector<std::string> ss_table_base_file_name_list,
-		 int fromLevel,
-		 int toLevel
+		 int from_level,
+		 int to_level
 	);
 
 	/**
@@ -132,6 +132,13 @@ private:
 
 
 
+	/**
+	 * @brief 在第level层查找key
+	 * 
+	 * @param key 键
+	 * @param level 层数
+	 * @return std::string 如果返回""，表示未找到任何记录，如果返回DELETED，表示该记录已被删除，否则返回对应的值
+	 */
 	std::string get_in_level(uint64_t key, int level);
 
 
