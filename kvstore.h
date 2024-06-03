@@ -107,6 +107,12 @@ private:
 	);
 
 	/**
+	 * @brief 从level-0开始执行级联合并操作
+	 * 
+	 */
+	void DoCascadeCompaction();
+
+	/**
 	 * @brief 从level层过滤出时间戳最小的filter_size个SSTable文件
 	 * 
 	 * @param ss_table_file_name_list 候选的SSTable文件名列表

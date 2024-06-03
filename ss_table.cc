@@ -165,7 +165,7 @@ namespace ss_table {
         std::ifstream fin;
         fin.open(ss_table_file_name);
         if(!fin) {
-            LOG_ERROR("Read SSTable file `%s` error", ss_table_file_name.c_str());
+            LOG_ERROR("Read SSTable file header `%s` error", ss_table_file_name.c_str());
             return {0, 0, 0, 0};
         }
 

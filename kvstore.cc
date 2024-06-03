@@ -59,30 +59,9 @@ void KVStore::put(uint64_t key, const std::string &s)
     mem_table_->Put(key, s);
     if (mem_table_->size() == MEM_TABLE_CAPACITY)
     {
-        // 将所有跳表数据写入level 0 SSTable文件
         ConvertMemTableToSSTable();
         mem_table_->Reset();
-
-        int level = 0;
-        while(CheckSSTableLevelOverflow(level)) {
-            std::vector<std::string> ss_table_base_file_name_list;
-            utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, level), ss_table_base_file_name_list);
-            if(level == 0) {
-                DoCompaction(ss_table_base_file_name_list, level, level + 1);
-                ++ level;
-                continue;
-            }
-
-            std::vector<std::string> compacted_ss_table_base_file_name_list;
-            FilterSSTableFiles(
-                ss_table_base_file_name_list,
-                level, 
-                ss_table_base_file_name_list.size() - ss_table::SSTable::SSTableMaxCountAtLevel(level),
-                compacted_ss_table_base_file_name_list
-            );
-            DoCompaction(compacted_ss_table_base_file_name_list, level, level + 1);
-            ++ level;
-        }
+        DoCascadeCompaction();
     }
 }
 /**
@@ -137,30 +116,9 @@ bool KVStore::del(uint64_t key)
     mem_table_->Put(key, DELETED);
     if (mem_table_->size() == MEM_TABLE_CAPACITY)
     {
-        // 将所有跳表数据写入level 0 SSTable文件
         ConvertMemTableToSSTable();
         mem_table_->Reset();
-
-        int level = 0;
-        while(CheckSSTableLevelOverflow(level)) {
-            std::vector<std::string> ss_table_base_file_name_list;
-            utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, level), ss_table_base_file_name_list);
-            if(level == 0) {
-                DoCompaction(ss_table_base_file_name_list, level, level + 1);
-                ++ level;
-                continue;
-            }
-
-            std::vector<std::string> compacted_ss_table_base_file_name_list;
-            FilterSSTableFiles(
-                ss_table_base_file_name_list,
-                level, 
-                ss_table_base_file_name_list.size() - ss_table::SSTable::SSTableMaxCountAtLevel(level),
-                compacted_ss_table_base_file_name_list
-            );
-            DoCompaction(compacted_ss_table_base_file_name_list, level, level + 1);
-            ++ level;
-        }
+        DoCascadeCompaction();
     }
     return true;
 }
@@ -353,7 +311,7 @@ std::string KVStore::get_in_level(uint64_t key, int level) {
         );
         auto header = ss_table::SSTable::ReadSSTableHeaderDirectly(ss_table_file_name);
         if(header.key_count == 0) {
-            // 读取SSTable文件失败
+            // 读取SSTable文件header失败
             continue;
         }
         if(key < header.min_key || key > header.max_key) {
@@ -410,6 +368,29 @@ void KVStore::DoCompaction(
     // 合并SSTable文件, 并将合并后的SSTable文件写入磁盘
     auto merged_time_stamped_tuple_list = ss_table::SSTable::MergeSSTables(ss_table_list);
     StoreSSTableToDisk(to_level, merged_time_stamped_tuple_list);
+}
+
+void KVStore::DoCascadeCompaction() {
+    int level = 0;
+    while(CheckSSTableLevelOverflow(level)) {
+        std::vector<std::string> ss_table_base_file_name_list;
+        utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, level), ss_table_base_file_name_list);
+        if(level == 0) {
+            DoCompaction(ss_table_base_file_name_list, level, level + 1);
+            ++ level;
+            continue;
+        }
+
+        std::vector<std::string> compacted_ss_table_base_file_name_list;
+        FilterSSTableFiles(
+            ss_table_base_file_name_list,
+            level, 
+            ss_table_base_file_name_list.size() - ss_table::SSTable::SSTableMaxCountAtLevel(level),
+            compacted_ss_table_base_file_name_list
+        );
+        DoCompaction(compacted_ss_table_base_file_name_list, level, level + 1);
+        ++ level;
+    }
 }
 
 void KVStore::FilterSSTableFiles(
