@@ -50,7 +50,12 @@ int main(int argc, char* argv[]) {
             kvstore.reset();
         } else if (command == "exit") {
             break;
-        } else {
+        } else if (command == "getall") {
+            uint64_t key;
+            std::cin >> key;
+            kvstore.get_everywhere(key);
+        } 
+        else {
             std::cout << "Unknown command" << std::endl;
         }
     }

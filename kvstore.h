@@ -147,9 +147,27 @@ private:
 	 */
 	std::string get_in_level(uint64_t key, int level);
 
-
 private:
 	std::string dir_;
 	skip_list::SkipList *mem_table_;
 	v_log::VLog *v_log_;
+
+public:
+	/* For Test Only */
+
+	/**
+	 * @brief 在每一层的每个SSTable中查找key，并打印结果
+	 * 
+	 * @param key 
+	 */
+	void get_everywhere(uint64_t key);
+
+	/**
+	 * @brief 在第level层的每个SSTable中查找key，并打印结果
+	 * 
+	 * @param key 
+	 * @param level 
+	 */
+	void get_everywhere_in_level(uint64_t key, int level);
+
 };

@@ -13,12 +13,11 @@
 #include <fstream>
 #define MAX 1024
 int main() {
-    std::ofstream out("script_1024.txt");
+    std::ofstream out("script_1024_beta.txt");
     out << "reset\n";
     for (int i = 0; i < MAX; ++i) {
-        out << "put " << i << " " << i << "\n";
+        out << "put " << i << " " << i + 1<< "\n";
     }
-    // test delete
     for (int i = 0; i < MAX; i += 2) {
         out << "del " << i << "\n";
     }

@@ -433,3 +433,67 @@ bool KVStore::CheckSSTableLevelOverflow(int level) const {
     utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, level), ss_table_file_name_list);
     return ss_table_file_name_list.size() > ss_table::SSTable::SSTableMaxCountAtLevel(level);
 }
+
+
+
+
+/* For Test Only */
+void KVStore::get_everywhere(uint64_t key) {
+    int level = 0;
+    auto mem_table_get_res = mem_table_->Get(key);
+    if(!mem_table_get_res.empty()) {
+        LOG_WARNING("key %lu found in mem table: %s", key, mem_table_get_res.c_str());
+    } else {
+        LOG_INFO("key %lu not found in mem table", key);
+    }
+    
+    while(utils::dirExists(ss_table::SSTable::BuildSSTableDirName(dir_, level))) {
+        LOG_INFO("## read level %d ##", level);
+        get_everywhere_in_level(key, level);
+        ++ level;
+    }
+}
+
+void KVStore::get_everywhere_in_level(uint64_t key, int level) {
+    std::vector<std::string> ss_table_base_file_name_list;
+    utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, level), ss_table_base_file_name_list);
+
+    std::unique_ptr<ss_table::SSTable> ss_table;
+    for (const auto &ss_table_base_file_name : ss_table_base_file_name_list)
+    {
+        auto ss_table_file_name = ss_table::SSTable::BuildSSTableFileName(
+            dir_,
+            level,
+            ss_table_base_file_name
+        );
+        auto header = ss_table::SSTable::ReadSSTableHeaderDirectly(ss_table_file_name);
+        if(header.key_count == 0) {
+            // 读取SSTable文件header失败
+            continue;
+        }
+        if(key < header.min_key || key > header.max_key) {
+            // key不在SSTable的键范围内
+            continue;
+        }
+
+        // 将整个SSTable文件读入内存
+        ss_table = ss_table::SSTable::FromFile(ss_table_file_name);
+        if(!ss_table) {
+            // 读取SSTable文件失败
+            continue;
+        }
+
+        auto ss_table_get_res = ss_table->Get(key);
+        if (ss_table_get_res.has_value())
+        {
+            // 找到了key对应的一条记录
+            if(ss_table_get_res.value().vlen) {
+                LOG_WARNING("key %lu found in level %d: %s", key, level, this->v_log_->Get(ss_table_get_res.value().offset, ss_table_get_res.value().vlen).c_str());
+                LOG_WARNING("time stamp: %lu", ss_table->header().time_stamp);
+            } else {
+                LOG_WARNING("key %lu found in level %d: DELETED", key, level);
+                LOG_WARNING("time stamp: %lu", ss_table->header().time_stamp);
+            }
+        }
+    }
+}
