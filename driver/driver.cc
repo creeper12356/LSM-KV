@@ -7,7 +7,9 @@
 #include <optional>
 #include <queue>
 #include "../kvstore.h"
-
+std::string gen_value(uint64_t key) {
+    return "s" + std::to_string(key);
+}
 int main(int argc, char* argv[]) {
     if (argc < 3) {
         std::cerr << "Usage: " << argv[0] << " <directory> <vlog>" << std::endl;
@@ -25,12 +27,16 @@ int main(int argc, char* argv[]) {
 
         if (command == "put") {
             uint64_t key;
-            std::string value;
             std::cin >> key;
-            std::getline(std::cin, value);
-            value = value.substr(1); // Remove leading space
-            kvstore.put(key, value);
-        } else if (command == "get") {
+            kvstore.put(key, gen_value(key));
+        } else if (command == "putrange") {
+            uint64_t start, end, step;
+            std::cin >> start >> end >> step;
+            for(uint64_t i = start; i <= end; i += step) {
+                kvstore.put(i, gen_value(i));
+            }
+        } 
+        else if (command == "get") {
             uint64_t key;
             std::cin >> key;
             std::string value = kvstore.get(key);
@@ -46,7 +52,17 @@ int main(int argc, char* argv[]) {
             if (!result) {
                 std::cout << "Not found" << std::endl;
             }
-        } else if (command == "reset") {
+        } else if(command == "delrange") {
+            uint64_t start, end, step;
+            std::cin >> start >> end >> step;
+            int found_count = 0;
+            int not_found_count = 0;
+            for(uint64_t i = start; i <= end; i += step) {
+                kvstore.del(i) ? ++found_count : ++not_found_count;
+            }
+            std::cout << "Found: " << found_count << ", Not found: " << not_found_count << std::endl;
+        } 
+        else if (command == "reset") {
             kvstore.reset();
         } else if (command == "exit") {
             break;

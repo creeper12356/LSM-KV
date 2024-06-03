@@ -204,8 +204,8 @@ void KVStore::LoadSSTablesToMemory(
     uint64_t &min_key,
     uint64_t &max_key
 ) {
-    min_key = std::numeric_limits<int>::max();
-    max_key = std::numeric_limits<int>::min();
+    min_key = std::numeric_limits<uint64_t>::max();
+    max_key = std::numeric_limits<uint64_t>::min();
 
     for(const auto &ss_table_file_name: ss_table_file_name_list) {
         auto ss_table = 
