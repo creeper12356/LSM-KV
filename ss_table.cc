@@ -130,7 +130,7 @@ namespace ss_table {
     ) {
         auto cmp = [](const TimeStampedKeyOffsetVlenTuple &a, const TimeStampedKeyOffsetVlenTuple &b) {
         return a.key_offset_vlen_tuple.key > b.key_offset_vlen_tuple.key 
-               || (a.key_offset_vlen_tuple.key == b.key_offset_vlen_tuple.key && a.time_stamp < b.time_stamp);
+               || (a.key_offset_vlen_tuple.key == b.key_offset_vlen_tuple.key && a.time_stamp > b.time_stamp);
         };
         std::priority_queue<
             TimeStampedKeyOffsetVlenTuple,
