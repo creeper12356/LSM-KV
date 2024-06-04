@@ -9,6 +9,14 @@
 
 namespace v_log {
     const char kMagic = 0xff;
+    struct DeallocVLogEntryInfo {
+        uint64_t key;
+        uint64_t offset;
+        std::string val;
+
+        DeallocVLogEntryInfo(uint64_t key, uint64_t offset, const std::string &val) 
+            : key(key), offset(offset), val(val) {}
+    };
 
     struct VLogEntry {
         uint32_t check_sum;
@@ -41,12 +49,6 @@ namespace v_log {
 
     };
 
-    struct VLogEntryKeyOffsetTuple {
-        uint64_t key;
-        uint64_t offset;
-
-        VLogEntryKeyOffsetTuple(uint64_t key, uint64_t offset) : key(key) , offset(offset) {}
-    };
 
     class VLog {
     public:
@@ -74,13 +76,10 @@ namespace v_log {
             return file_name_;
         }
 
-        /**
-         * @brief 扫描VLog文件，返回扫描到的Entry信息列表
-         * 
-         * @param chunck_size 至少扫描的字节数
-         * @return std::vector<VLogEntryKeyOffsetTuple> 
-         */
-        std::vector<VLogEntryKeyOffsetTuple> ScanVLogEntries(uint64_t chunck_size);
+        void DeallocSpace(
+            uint64_t chunk_size, 
+            std::vector<DeallocVLogEntryInfo> &dealloc_entry_list
+        );
 
 
     private:

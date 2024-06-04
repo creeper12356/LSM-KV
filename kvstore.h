@@ -14,6 +14,7 @@ namespace skip_list
 namespace v_log
 {
 	class VLog;
+	struct DeallocVLogEntryInfo;
 }
 namespace ss_table
 {
@@ -150,8 +151,6 @@ private:
 	 * @return false VLog entry未过期
 	 */
 	bool IsVLogEntryOutdated(uint64_t v_log_entry_key, uint64_t v_log_entry_offset) const;
-
-
 
 	/**
 	 * @brief 在第level层SSTable查找key，返回对应的值

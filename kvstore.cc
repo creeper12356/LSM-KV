@@ -189,20 +189,13 @@ void KVStore::scan(uint64_t key1, uint64_t key2, std::list<std::pair<uint64_t, s
  */
 void KVStore::gc(uint64_t chunk_size)
 {
-    auto scanned_entries = v_log_->ScanVLogEntries(chunk_size);
-    if(scanned_entries.empty()) {
-        // TODO: 修改VLog::gc签名
-        LOG_ERROR("GC error");
-    }
-
-    for(const auto &entry: scanned_entries) {
+    std::vector<v_log::DeallocVLogEntryInfo> dealloc_entries;
+    v_log_->DeallocSpace(chunk_size, dealloc_entries);
+    for(const auto &entry: dealloc_entries) {
         if(!IsVLogEntryOutdated(entry.key, entry.offset)) {
-            this->put(entry.key, "TODO: 值");
+            this->put(entry.key, entry.val);
         }
     }
-
-    // VLog文件打洞
-
 }
 
 void KVStore::ConvertMemTableToSSTable()

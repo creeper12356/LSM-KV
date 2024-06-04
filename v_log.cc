@@ -78,24 +78,26 @@ std::string v_log::VLog::Get(uint64_t offset, uint32_t vlen) {
     return val;
 }
 
-std::vector<v_log::VLogEntryKeyOffsetTuple> v_log::VLog::ScanVLogEntries(uint64_t chunck_size) {
+void v_log::VLog::DeallocSpace(
+    uint64_t chunck_size, 
+    std::vector<v_log::DeallocVLogEntryInfo> &dealloc_entry_list
+) {
     off_t offset = utils::seek_data_block(file_name_);
     if(offset < 0) {
         LOG_ERROR("Failed to open VLog file");
-        return std::vector<v_log::VLogEntryKeyOffsetTuple> ();
+        return ;
     }
 
     std::ifstream fin;
     fin.open(file_name_);
     if(!fin) {
         LOG_ERROR("Failed to open VLog file");
-        return std::vector<v_log::VLogEntryKeyOffsetTuple> ();
+        return ;
     }
 
     fin.seekg(offset);
     uint64_t read_chunck_size = 0;
 
-    std::vector<VLogEntryKeyOffsetTuple> result;
     while(read_chunck_size < chunck_size) {
         VLogEntry v_log_entry;
         uint64_t val_offset;
@@ -109,11 +111,12 @@ std::vector<v_log::VLogEntryKeyOffsetTuple> v_log::VLog::ScanVLogEntries(uint64_
             continue;
         }
 
-        result.emplace_back(v_log_entry.key, val_offset);
+        dealloc_entry_list.emplace_back(v_log_entry.key, val_offset, v_log_entry.val);
         read_chunck_size += v_log_entry.size();
     }
 
-    return result;
+    // 文件打洞
+    utils::de_alloc_file(file_name_, offset, read_chunck_size);
 }
 
 uint64_t v_log::VLogEntry::ReadFromFile(std::ifstream &fin) {
