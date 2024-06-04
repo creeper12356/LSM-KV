@@ -20,6 +20,10 @@ namespace v_log {
          */
         uint64_t Insert(uint64_t key, const std::string &val);
         std::string Get(uint64_t offset, uint32_t vlen);
+        
+        const std::string &file_name() const {
+            return file_name_;
+        }
     private:
         std::string file_name_;
 

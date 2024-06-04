@@ -36,16 +36,25 @@ KVStore::KVStore(const std::string &dir, const std::string &vlog)
         }
         ++level;
     }
+    // TODO: 将SSTable文件部分加载到内存表中
     LOG_INFO("Check SSTable files complete");
     LOG_INFO("%d SSTable level(s) detected", level);
 
     mem_table_ = new skip_list::SkipList;
     v_log_ = new v_log::VLog(vlog);
+
 }
 
 KVStore::~KVStore()
 {
     LOG_INFO("KVStore is destroyed");
+    
+    if(mem_table_->size()) {
+        LOG_INFO("Store mem table to SSTable");
+        ConvertMemTableToSSTable();
+        DoCascadeCompaction();
+    }
+
     delete mem_table_;
     delete v_log_;
 }
@@ -129,16 +138,28 @@ bool KVStore::del(uint64_t key)
  */
 void KVStore::reset()
 {
+    // 清空内存表
     mem_table_->Reset();
 
+    // 删除所有SSTable文件及其目录
     int level = 0;
     while(utils::dirExists(ss_table::SSTable::BuildSSTableDirName(dir_, level))) {
         std::vector<std::string> base_file_name_list;
         utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, level), base_file_name_list);
         for(const auto &base_file_name: base_file_name_list) {
-            utils::rmfile(ss_table::SSTable::BuildSSTableFileName(dir_, level, base_file_name));
+            if(utils::rmfile(ss_table::SSTable::BuildSSTableFileName(dir_, level, base_file_name)) < 0) {
+                LOG_WARNING("Failed to remove SSTable file %s", base_file_name.c_str());
+            }
+        }
+        if(utils::rmdir(ss_table::SSTable::BuildSSTableDirName(dir_, level)) < 0) {
+            LOG_WARNING("Failed to remove SSTable directory level-%d", level);
         }
         ++level;
+    }
+
+    // 删除VLog文件
+    if(utils::rmfile(v_log_->file_name()) < 0) {
+        LOG_WARNING("Failed to remove VLog file");
     }
 }
 

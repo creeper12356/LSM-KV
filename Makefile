@@ -15,7 +15,7 @@ driver_test: driver.o kvstore.o skip_list.o bloom_filter.o ss_table.o v_log.o lo
 	$(LINK.o) -o driver_test driver.o kvstore.o skip_list.o bloom_filter.o ss_table.o v_log.o logger.o
 	
 driver: driver_test
-	./driver_test data/ data/vlog
+	./driver_test data data/vlog
 
 logger.o: utils/logger.cc utils/logger.h
 	$(CC) $(CXXFLAGS) -c utils/logger.cc -DENABLE_LOG

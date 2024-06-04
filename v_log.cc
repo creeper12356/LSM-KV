@@ -7,12 +7,7 @@
 #include <vector>
 #include <iostream>
 
-v_log::VLog::VLog(const std::string &v_log_file_name): file_name_(v_log_file_name) {
-    // 创建新的vlog文件
-    std::ofstream fout;
-    fout.open(file_name_);
-    fout.close();
-}
+v_log::VLog::VLog(const std::string &v_log_file_name): file_name_(v_log_file_name) {}
 
 uint64_t v_log::VLog::Insert(uint64_t key, const std::string &val) {
     std::ofstream fout;
