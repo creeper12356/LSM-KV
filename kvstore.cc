@@ -193,9 +193,13 @@ void KVStore::gc(uint64_t chunk_size)
     v_log_->DeallocSpace(chunk_size, dealloc_entries);
     for(const auto &entry: dealloc_entries) {
         if(!IsVLogEntryOutdated(entry.key, entry.offset)) {
-            this->put(entry.key, entry.val);
+            mem_table_->Put(entry.key, entry.val);
         }
     }
+    
+    ConvertMemTableToSSTable();
+    mem_table_->Reset();
+    DoCascadeCompaction();
 }
 
 void KVStore::ConvertMemTableToSSTable()

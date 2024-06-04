@@ -17,9 +17,26 @@ v_log::VLog::VLog(const std::string &v_log_file_name): file_name_(v_log_file_nam
         std::ofstream fout;
         fout.open(file_name_, std::ios::binary);
         fout.close();
+        tail_ = 0;
         return ;
     }
 
+    tail_ = utils::seek_data_block(file_name_);
+    fin.seekg(tail_);
+    VLogEntry v_log_entry;
+    while(true) {
+        uint64_t val_offset = v_log_entry.ReadFromFile(fin);
+        if(!val_offset) {
+            LOG_ERROR("Failed to read VLog entry");
+            fin.close();
+            return ;
+        }
+        if(v_log_entry.InspectChecksum()) {
+            break;
+        }
+        tail_ += v_log_entry.size();
+    }
+    
     fin.close();
 }
 
@@ -78,24 +95,18 @@ std::string v_log::VLog::Get(uint64_t offset, uint32_t vlen) {
     return val;
 }
 
-void v_log::VLog::DeallocSpace(
+bool v_log::VLog::DeallocSpace(
     uint64_t chunck_size, 
     std::vector<v_log::DeallocVLogEntryInfo> &dealloc_entry_list
 ) {
-    off_t offset = utils::seek_data_block(file_name_);
-    if(offset < 0) {
-        LOG_ERROR("Failed to open VLog file");
-        return ;
-    }
-
     std::ifstream fin;
     fin.open(file_name_);
     if(!fin) {
         LOG_ERROR("Failed to open VLog file");
-        return ;
+        return false;
     }
 
-    fin.seekg(offset);
+    fin.seekg(tail_);
     uint64_t read_chunck_size = 0;
 
     while(read_chunck_size < chunck_size) {
@@ -116,7 +127,8 @@ void v_log::VLog::DeallocSpace(
     }
 
     // 文件打洞
-    utils::de_alloc_file(file_name_, offset, read_chunck_size);
+    utils::de_alloc_file(file_name_, tail_, read_chunck_size);
+    return true;
 }
 
 uint64_t v_log::VLogEntry::ReadFromFile(std::ifstream &fin) {

@@ -54,7 +54,7 @@ public:
 	
 private:
 	/**
-	 * @brief 将内存表（跳表）写入SSTable文件
+	 * @brief 将内存表（跳表）中的所有键值对写入单个SSTable文件
 	 */
 	void ConvertMemTableToSSTable();
 
