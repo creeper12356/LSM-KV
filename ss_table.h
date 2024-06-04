@@ -52,9 +52,17 @@ namespace ss_table
     {
         uint64_t time_stamp;
         KeyOffsetVlenTuple key_offset_vlen_tuple;
+        int ss_table_index;
 
-        TimeStampedKeyOffsetVlenTuple(uint64_t time_stamp, const KeyOffsetVlenTuple &key_offset_vlen_tuple)
-            : time_stamp(time_stamp), key_offset_vlen_tuple(key_offset_vlen_tuple) { }
+        TimeStampedKeyOffsetVlenTuple(
+            uint64_t time_stamp, 
+            const KeyOffsetVlenTuple &key_offset_vlen_tuple,
+            int ss_table_index
+        )
+            : time_stamp(time_stamp), 
+            key_offset_vlen_tuple(key_offset_vlen_tuple),
+            ss_table_index(ss_table_index)
+             { }
     };
     struct SSTableMetaData {
         Header header;

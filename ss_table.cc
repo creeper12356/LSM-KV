@@ -130,7 +130,8 @@ namespace ss_table {
     ) {
         auto cmp = [](const TimeStampedKeyOffsetVlenTuple &a, const TimeStampedKeyOffsetVlenTuple &b) {
         return a.key_offset_vlen_tuple.key > b.key_offset_vlen_tuple.key 
-               || (a.key_offset_vlen_tuple.key == b.key_offset_vlen_tuple.key && a.time_stamp > b.time_stamp);
+               || (a.key_offset_vlen_tuple.key == b.key_offset_vlen_tuple.key && a.time_stamp > b.time_stamp)
+               || (a.key_offset_vlen_tuple.key == b.key_offset_vlen_tuple.key && a.time_stamp == b.time_stamp && a.ss_table_index < b.ss_table_index);
         };
         std::priority_queue<
             TimeStampedKeyOffsetVlenTuple,
@@ -138,11 +139,12 @@ namespace ss_table {
             decltype(cmp)
         > pq(cmp);
 
-
+        size_t ss_table_index = 0;
         for (const auto &ss_table : ss_table_list) {
             for (const auto &tuple : ss_table->key_offset_vlen_tuple_list()) {
-                pq.emplace(ss_table->header().time_stamp, tuple);
+                pq.emplace(ss_table->header().time_stamp, tuple, ss_table_index);
             }
+            ++ ss_table_index;
         }
 
         std::vector<TimeStampedKeyOffsetVlenTuple> merged_results;
@@ -150,6 +152,7 @@ namespace ss_table {
             auto current = pq.top();
             pq.pop();
 
+            // 取出key相同的元组中，优先级最低的元组
             while (!pq.empty() && pq.top().key_offset_vlen_tuple.key == current.key_offset_vlen_tuple.key) {
                 current = pq.top();
                 pq.pop();

@@ -1,6 +1,6 @@
 
 LINK.o = $(LINK.cc)
-CXXFLAGS = -std=c++20 -Wall -g -Ofast
+CXXFLAGS = -std=c++20 -Wall -g -Ofast -march=native -mtune=native -fopenmp
 CC = g++
 
 all: correctness persistence my_correctness
@@ -18,7 +18,7 @@ driver: driver_test
 	./driver_test data data/vlog
 
 logger.o: utils/logger.cc utils/logger.h
-	$(CC) $(CXXFLAGS) -c utils/logger.cc -DENABLE_LOG
+	$(CC) $(CXXFLAGS) -c utils/logger.cc 
 
 driver.o: driver/driver.cc
 	$(CC) $(CXXFLAGS) -c driver/driver.cc
