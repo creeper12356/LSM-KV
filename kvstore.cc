@@ -157,11 +157,9 @@ void KVStore::reset()
         }
         ++level;
     }
-
-    // 删除VLog文件
-    if(utils::rmfile(v_log_->file_name()) < 0) {
-        LOG_WARNING("Failed to remove VLog file");
-    }
+    
+    // 重置VLog
+    v_log_->Reset();
 }
 
 /**

@@ -22,7 +22,7 @@ namespace v_log
 
     struct VLogEntry
     {
-        uint32_t check_sum;
+        uint16_t check_sum;
         uint64_t key;
         uint32_t vlen;
         std::string val;
@@ -56,7 +56,7 @@ namespace v_log
     public:
         VLog(const std::string &v_log_file_name);
         /**
-         * 向VLog文件中插入键值对
+         * @brief 向VLog文件尾部插入键值对
          * @param key
          * @param val
          * @return 插入的值在文件中的偏移量
@@ -69,9 +69,15 @@ namespace v_log
          *
          * @param offset 偏移量
          * @param vlen 值的长度
-         * @return std::string
+         * @return std::string 读取成功返回值，读取失败返回""（读取失败包括VLog文件不存在的情况）
          */
         std::string Get(uint64_t offset, uint32_t vlen);
+
+        /**
+         * @brief 重置尾指针，删除VLog文件
+         * 
+         */
+        void Reset();
 
 
         /**

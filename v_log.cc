@@ -22,6 +22,7 @@ v_log::VLog::VLog(const std::string &v_log_file_name): file_name_(v_log_file_nam
     }
 
     tail_ = utils::seek_data_block(file_name_);
+    LOG_INFO("VLog tail: %lu", tail_);
     fin.seekg(tail_);
     VLogEntry v_log_entry;
     while(true) {
@@ -79,7 +80,7 @@ std::string v_log::VLog::Get(uint64_t offset, uint32_t vlen) {
     std::ifstream fin;
     fin.open(file_name_, std::ios::binary);
     if(!fin) {
-        LOG_ERROR("Failed to open file: %s", file_name_.c_str());
+        // 无法打开文件，返回空字符串
         return "";
     }
     
@@ -93,6 +94,13 @@ std::string v_log::VLog::Get(uint64_t offset, uint32_t vlen) {
     delete [] val_c_str;
     fin.close();
     return val;
+}
+
+void v_log::VLog::Reset() {
+    tail_ = 0;
+    if(utils::rmfile(file_name_) < 0) {
+        LOG_WARNING("Failed to remove VLog file");
+    }
 }
 
 bool v_log::VLog::DeallocSpace(
@@ -118,7 +126,7 @@ bool v_log::VLog::DeallocSpace(
         }
 
         if(!v_log_entry.InspectChecksum()) {
-            LOG_WARNING("Inspect checksum failed, try next...");
+            // LOG_WARNING("Inspect checksum failed, try next...");
             continue;
         }
 
@@ -128,15 +136,20 @@ bool v_log::VLog::DeallocSpace(
 
     // 文件打洞
     utils::de_alloc_file(file_name_, tail_, read_chunck_size);
+    tail_ += read_chunck_size;
     return true;
 }
 
 uint64_t v_log::VLogEntry::ReadFromFile(std::ifstream &fin) {
     char ch = 0;
-    uint64_t val_offset;
     while(ch != kMagic) {
-        if(!fin.read(&ch, 1)) {
-            LOG_ERROR("Read Magic error");
+        fin.read(&ch, 1);
+        if(fin.eof()) {
+            LOG_ERROR("Reach EOF");
+            return 0;
+        }
+        if(!fin) {
+            LOG_ERROR("Read Magic byte error");
             return 0;
         }
     }
@@ -149,15 +162,25 @@ uint64_t v_log::VLogEntry::ReadFromFile(std::ifstream &fin) {
 
     // 读取key-vlen-val部分
     fin.read(reinterpret_cast<char *> (&key), sizeof(key));
+    if(!fin) {
+        LOG_ERROR("Read Key error");
+        return 0;
+    }
     fin.read(reinterpret_cast<char *> (&vlen), sizeof(vlen));
+    if(!fin) {
+        LOG_ERROR("Read Vlen error");
+        return 0;
+    }
+    uint64_t val_offset;
     val_offset = fin.tellg();
-    char *v_log_entry_val_c_str = new char[vlen];
+    char *v_log_entry_val_c_str = new char[vlen + 1];
+    v_log_entry_val_c_str[vlen] = '\0';
     fin.read(v_log_entry_val_c_str, vlen);
     val = std::string(v_log_entry_val_c_str);
-    delete v_log_entry_val_c_str;
+    delete [] v_log_entry_val_c_str;
 
     if(!fin) {
-        LOG_ERROR("Read Key-Vlen-Val error");
+        LOG_ERROR("Read Value error");
         return 0;
     }
 
