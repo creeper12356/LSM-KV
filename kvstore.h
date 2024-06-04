@@ -29,11 +29,15 @@ enum class KeyStatus {
 };
 class KVStore : public KVStoreAPI
 {
+
+// --------------------------------------
+// Public Interface
+// --------------------------------------
 public:
 	/**
 	 * @brief Construct a new KVStore object
 	 *
-	 * @param dir SSTable文件存储目录
+	 * @param dir SSTable文件存储目录(末尾无"/")
 	 * @param vlog vlog文件路径
 	 */
 	KVStore(const std::string &dir, const std::string &vlog);
@@ -53,8 +57,39 @@ public:
 	void gc(uint64_t chunk_size) override;
 	
 private:
+// --------------------------------------
+// Helper Get Functions
+// --------------------------------------
 	/**
-	 * @brief 将内存表（跳表）中的所有键值对写入单个SSTable文件
+	 * @brief 在第level层SSTable查找key，返回对应的值
+	 * 
+	 * @param key 键
+	 * @param level 层数
+	 * @return std::string 
+	 * 		- 如果返回""，表示未找到任何记录;
+	 * 		- 如果返回DELETED，表示该记录已被删除;
+	 * 		- 否则返回对应的值。
+	 */
+	std::string GetValueInSSTable (uint64_t key, int level) const ;
+
+	/**
+	 * @brief 在第level层SSTable查找key，直接返回时间戳最大的SSTable::Get查找结果
+	 * @details 该函数为低级接口
+	 * 
+	 * @param key 键
+	 * @param level 层数
+	 * @param status 返回查找结果状态
+	 * @return std::optional<ss_table::SSTableGetResult> 
+	 */
+	std::optional<ss_table::SSTableGetResult> GetInSSTable (uint64_t key, int level, KeyStatus &status) const ;
+
+
+
+// --------------------------------------
+// Load and Store SSTable Files
+// --------------------------------------
+	/**
+	 * @brief 将内存表中的所有键值对写入level-0的单个SSTable文件
 	 */
 	void ConvertMemTableToSSTable();
 
@@ -91,16 +126,20 @@ private:
 	);
 
 	/**
-	 * @brief 从tuples生产新的SSTable文件，写入第level层
+	 * @brief 从tuples生成新的SSTable文件，写入第level层
 	 * 
 	 * @param level 层数
 	 * @param tuples 合并后得到的带有时间戳的KeyOffsetVlen元组 
 	 */
-	void StoreSSTableToDisk(
+	void StoreSSTablesToDisk(
 		int level,
 		const std::vector<ss_table::TimeStampedKeyOffsetVlenTuple> &tuples
 	);
 
+
+// --------------------------------------
+// Compaction Operations
+// --------------------------------------
 	/**
 	 * @brief 执行合并操作
 	 * 
@@ -144,6 +183,10 @@ private:
 	 */
 	bool CheckSSTableLevelOverflow(int level) const;
 
+
+// --------------------------------------
+// Garbage Collection Operations
+// --------------------------------------
 	/**
 	 * @brief 判断VLogEntry是否过期
 	 * @details 通过查找内存表和逐层SSTable，判断键为key，偏移为offset的VLog entry是否过期并返回结果
@@ -152,38 +195,19 @@ private:
 	 */
 	bool IsVLogEntryOutdated(uint64_t v_log_entry_key, uint64_t v_log_entry_offset) const;
 
-	/**
-	 * @brief 在第level层SSTable查找key，返回对应的值
-	 * 
-	 * @param key 键
-	 * @param level 层数
-	 * @return std::string 
-	 * 		- 如果返回""，表示未找到任何记录;
-	 * 		- 如果返回DELETED，表示该记录已被删除;
-	 * 		- 否则返回对应的值。
-	 */
-	std::string GetInLevel (uint64_t key, int level) const ;
 
-
-	/**
-	 * @brief 在第level层SSTable查找key，直接返回时间戳最大的SSTable::Get查找结果
-	 * @details 该函数为低级接口
-	 * 
-	 * @param key 键
-	 * @param level 层数
-	 * @param status 返回查找结果状态
-	 * @return std::optional<ss_table::SSTableGetResult> 
-	 */
-	std::optional<ss_table::SSTableGetResult> GetInLevel (uint64_t key, int level, KeyStatus &status) const ;
-
+// --------------------------------------
+// Private Members
+// --------------------------------------
 private:
 	std::string dir_;
 	skip_list::SkipList *mem_table_;
 	v_log::VLog *v_log_;
 
+// --------------------------------------
+// For Test Only
+// --------------------------------------
 public:
-	/* For Test Only */
-
 	/**
 	 * @brief 在每一层的每个SSTable中查找key，并打印结果
 	 * 

@@ -52,7 +52,7 @@ namespace ss_table
     {
         uint64_t time_stamp;
         KeyOffsetVlenTuple key_offset_vlen_tuple;
-        int ss_table_index;
+        int ss_table_index; // 元组之前所在的SSTable索引（可读性下降）
 
         TimeStampedKeyOffsetVlenTuple(
             uint64_t time_stamp, 
@@ -129,7 +129,7 @@ namespace ss_table
 
 
         /**
-         * @brief 生成唯一的SSTable文件名
+         * @brief 生成唯一的SSTable文件名(基于UNIX时间戳)
          * 
          * @param dir 基准路径
          * @param level 层数

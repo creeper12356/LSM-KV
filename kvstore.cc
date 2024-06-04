@@ -97,7 +97,7 @@ std::string KVStore::get(uint64_t key)
     std::string result;
     while (utils::dirExists(ss_table::SSTable::BuildSSTableDirName(dir_, level)))
     {
-        result = GetInLevel(key, level);
+        result = GetValueInSSTable(key, level);
         if(result == DELETED) {
             // 查找到删除标记
             return "";
@@ -216,12 +216,14 @@ void KVStore::ConvertMemTableToSSTable()
     }
 
     // 将SSTable写入文件
+    uint64_t now = std::chrono::system_clock::now().time_since_epoch().count();
     auto ss_table = ss_table::SSTable::NewSSTable(
-        ss_table::SSTable::BuildUniqueSSTableFileName(
+        ss_table::SSTable::BuildSSTableFileName(
             dir_, 
-            0
+            0, 
+            std::to_string(now) + ".sst"
         ),
-        std::chrono::system_clock::now().time_since_epoch().count(),
+        now,
         inserted_tuples
     );
     ss_table->WriteToFile();
@@ -283,7 +285,7 @@ void KVStore::LoadSSTablesInRangeToMemory(
     }
 }
 
-void KVStore::StoreSSTableToDisk(
+void KVStore::StoreSSTablesToDisk(
     int level,
     const std::vector<ss_table::TimeStampedKeyOffsetVlenTuple> 
         &merged_time_stamped_tuple_list
@@ -326,7 +328,7 @@ void KVStore::StoreSSTableToDisk(
     }
 }
 
-std::optional<ss_table::SSTableGetResult> KVStore::GetInLevel (
+std::optional<ss_table::SSTableGetResult> KVStore::GetInSSTable (
     uint64_t key, 
     int level, 
     KeyStatus &status
@@ -383,9 +385,9 @@ std::optional<ss_table::SSTableGetResult> KVStore::GetInLevel (
     return result;
 }
 
-std::string KVStore::GetInLevel(uint64_t key, int level) const {
+std::string KVStore::GetValueInSSTable(uint64_t key, int level) const {
     KeyStatus key_status;
-    std::optional<ss_table::SSTableGetResult> optional_offset = GetInLevel(key, level, key_status);
+    std::optional<ss_table::SSTableGetResult> optional_offset = GetInSSTable(key, level, key_status);
 
     switch (key_status)
     {
@@ -427,7 +429,7 @@ void KVStore::DoCompaction(
 
     // 合并SSTable文件, 并将合并后的SSTable文件写入磁盘
     auto merged_time_stamped_tuple_list = ss_table::SSTable::MergeSSTables(ss_table_list);
-    StoreSSTableToDisk(to_level, merged_time_stamped_tuple_list);
+    StoreSSTablesToDisk(to_level, merged_time_stamped_tuple_list);
 }
 
 void KVStore::DoCascadeCompaction() {
@@ -507,7 +509,7 @@ bool KVStore::IsVLogEntryOutdated(uint64_t v_log_entry_key, uint64_t v_log_entry
     std::optional<ss_table::SSTableGetResult> result;
     while (utils::dirExists(ss_table::SSTable::BuildSSTableDirName(dir_, level)))
     {
-        result = GetInLevel(v_log_entry_key, level, key_status);
+        result = GetInSSTable(v_log_entry_key, level, key_status);
         if(key_status == KeyStatus::kDeleted) {
             // 在SSTable中查找到删除标记
             return true;
