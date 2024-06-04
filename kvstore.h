@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <list>
+#include <optional>
 
 namespace skip_list
 {
@@ -18,7 +19,13 @@ namespace ss_table
 {
 	class SSTable;
 	struct TimeStampedKeyOffsetVlenTuple;
+	struct SSTableGetResult;
 }
+enum class KeyStatus {
+	kFound,
+	kNotFound,
+	kDeleted
+};
 class KVStore : public KVStoreAPI
 {
 public:
@@ -136,16 +143,39 @@ private:
 	 */
 	bool CheckSSTableLevelOverflow(int level) const;
 
+	/**
+	 * @brief 判断VLogEntry是否过期
+	 * @details 通过查找内存表和逐层SSTable，判断键为key，偏移为offset的VLog entry是否过期并返回结果
+	 * @return true VLog entry已经过期，需要进行垃圾回收
+	 * @return false VLog entry未过期
+	 */
+	bool IsVLogEntryOutdated(uint64_t v_log_entry_key, uint64_t v_log_entry_offset) const;
+
 
 
 	/**
-	 * @brief 在第level层查找key
+	 * @brief 在第level层SSTable查找key，返回对应的值
 	 * 
 	 * @param key 键
 	 * @param level 层数
-	 * @return std::string 如果返回""，表示未找到任何记录，如果返回DELETED，表示该记录已被删除，否则返回对应的值
+	 * @return std::string 
+	 * 		- 如果返回""，表示未找到任何记录;
+	 * 		- 如果返回DELETED，表示该记录已被删除;
+	 * 		- 否则返回对应的值。
 	 */
-	std::string get_in_level(uint64_t key, int level);
+	std::string GetInLevel (uint64_t key, int level) const ;
+
+
+	/**
+	 * @brief 在第level层SSTable查找key，直接返回时间戳最大的SSTable::Get查找结果
+	 * @details 该函数为低级接口
+	 * 
+	 * @param key 键
+	 * @param level 层数
+	 * @param status 返回查找结果状态
+	 * @return std::optional<ss_table::SSTableGetResult> 
+	 */
+	std::optional<ss_table::SSTableGetResult> GetInLevel (uint64_t key, int level, KeyStatus &status) const ;
 
 private:
 	std::string dir_;

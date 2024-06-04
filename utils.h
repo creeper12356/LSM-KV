@@ -157,7 +157,7 @@ namespace utils
     }
 
     /**
-     * find the offset of the first block (size of a blcok is 4kB) that has data from the beginning of a file
+     * find the offset of the first block (size of a block is 4kB) that has data from the beginning of a file
      * @param path file to be searched for.
      * @return -1 if fail to open, offset if find successfully.
      */

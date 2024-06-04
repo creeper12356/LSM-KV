@@ -3,20 +3,35 @@
 //
 #include "v_log.h"
 #include "utils.h"
+#include "utils/logger.h"
+
 #include <fstream>
 #include <vector>
 #include <iostream>
 
-v_log::VLog::VLog(const std::string &v_log_file_name): file_name_(v_log_file_name) {}
+v_log::VLog::VLog(const std::string &v_log_file_name): file_name_(v_log_file_name) {
+    // TODO: 使用别的方式检查VLog文件是否存在
+    std::ifstream fin;
+    fin.open(file_name_, std::ios::binary);
+    if (!fin) {
+        std::ofstream fout;
+        fout.open(file_name_, std::ios::binary);
+        fout.close();
+        return ;
+    }
+
+    fin.close();
+}
 
 uint64_t v_log::VLog::Insert(uint64_t key, const std::string &val) {
     std::ofstream fout;
 
     fout.open(file_name_, std::ios::app | std::ios::binary);
 
+    // 写入Magic byte
     fout.write(&kMagic, 1);
 
-    // 拼接字符串
+    // 拼接key-vlen-value字符串
     std::string data_str;
     uint32_t vlen = val.size();
     data_str.append(reinterpret_cast<const char*> (&key), sizeof (uint64_t));
@@ -38,12 +53,19 @@ uint64_t v_log::VLog::Insert(uint64_t key, const std::string &val) {
     fout.write(val.c_str(), val.size());
 
     fout.close();
+
+    
     return offset;
 }
 
 std::string v_log::VLog::Get(uint64_t offset, uint32_t vlen) {
     std::ifstream fin;
     fin.open(file_name_, std::ios::binary);
+    if(!fin) {
+        LOG_ERROR("Failed to open file: %s", file_name_.c_str());
+        return "";
+    }
+    
     fin.seekg(offset);
     std::string val = "";
     char* val_c_str = new char[vlen + 1];
@@ -52,5 +74,96 @@ std::string v_log::VLog::Get(uint64_t offset, uint32_t vlen) {
     val = val_c_str;
 
     delete [] val_c_str;
+    fin.close();
     return val;
+}
+
+std::vector<v_log::VLogEntryKeyOffsetTuple> v_log::VLog::ScanVLogEntries(uint64_t chunck_size) {
+    off_t offset = utils::seek_data_block(file_name_);
+    if(offset < 0) {
+        LOG_ERROR("Failed to open VLog file");
+        return std::vector<v_log::VLogEntryKeyOffsetTuple> ();
+    }
+
+    std::ifstream fin;
+    fin.open(file_name_);
+    if(!fin) {
+        LOG_ERROR("Failed to open VLog file");
+        return std::vector<v_log::VLogEntryKeyOffsetTuple> ();
+    }
+
+    fin.seekg(offset);
+    uint64_t read_chunck_size = 0;
+
+    std::vector<VLogEntryKeyOffsetTuple> result;
+    while(read_chunck_size < chunck_size) {
+        VLogEntry v_log_entry;
+        uint64_t val_offset;
+
+        if(!(val_offset = v_log_entry.ReadFromFile(fin))) {
+            break;
+        }
+
+        if(!v_log_entry.InspectChecksum()) {
+            LOG_WARNING("Inspect checksum failed, try next...");
+            continue;
+        }
+
+        result.emplace_back(v_log_entry.key, val_offset);
+        read_chunck_size += v_log_entry.size();
+    }
+
+    return result;
+}
+
+uint64_t v_log::VLogEntry::ReadFromFile(std::ifstream &fin) {
+    char ch = 0;
+    uint64_t val_offset;
+    while(ch != kMagic) {
+        if(!fin.read(&ch, 1)) {
+            LOG_ERROR("Read Magic error");
+            return 0;
+        }
+    }
+
+    // 读取check sum 
+    if(!fin.read(reinterpret_cast<char *> (&check_sum), sizeof(check_sum))) {
+        LOG_ERROR("Read checksum error");
+        return 0;
+    }
+
+    // 读取key-vlen-val部分
+    fin.read(reinterpret_cast<char *> (&key), sizeof(key));
+    fin.read(reinterpret_cast<char *> (&vlen), sizeof(vlen));
+    val_offset = fin.tellg();
+    char *v_log_entry_val_c_str = new char[vlen];
+    fin.read(v_log_entry_val_c_str, vlen);
+    val = std::string(v_log_entry_val_c_str);
+    delete v_log_entry_val_c_str;
+
+    if(!fin) {
+        LOG_ERROR("Read Key-Vlen-Val error");
+        return 0;
+    }
+
+    return val_offset;
+
+}
+
+bool v_log::VLogEntry::InspectChecksum() const {
+    // 拼接key-vlen-value字符串
+    std::string key_vlen_value_str;
+    key_vlen_value_str.append(reinterpret_cast<const char*> (&key), sizeof (key));
+    key_vlen_value_str.append(reinterpret_cast<const char*> (&vlen), sizeof (vlen));
+    key_vlen_value_str.append(val);
+    std::vector<unsigned char> key_vlen_value_data(
+        key_vlen_value_str.begin(), 
+        key_vlen_value_str.end()
+    );
+
+    return check_sum == utils::crc16(key_vlen_value_data);
+}
+
+uint64_t v_log::VLogEntry::size() const {
+    return sizeof(char) + sizeof(check_sum) + sizeof(key) + sizeof(vlen) + vlen;
 }

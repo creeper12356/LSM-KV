@@ -14,6 +14,7 @@
 #include <limits>
 #include <algorithm>
 #include <chrono>
+#include <optional>
 
 KVStore::KVStore(const std::string &dir, const std::string &vlog)
     : KVStoreAPI(dir, vlog), dir_(dir)
@@ -96,7 +97,7 @@ std::string KVStore::get(uint64_t key)
     std::string result;
     while (utils::dirExists(ss_table::SSTable::BuildSSTableDirName(dir_, level)))
     {
-        result = get_in_level(key, level);
+        result = GetInLevel(key, level);
         if(result == DELETED) {
             // 查找到删除标记
             return "";
@@ -188,6 +189,20 @@ void KVStore::scan(uint64_t key1, uint64_t key2, std::list<std::pair<uint64_t, s
  */
 void KVStore::gc(uint64_t chunk_size)
 {
+    auto scanned_entries = v_log_->ScanVLogEntries(chunk_size);
+    if(scanned_entries.empty()) {
+        // TODO: 修改VLog::gc签名
+        LOG_ERROR("GC error");
+    }
+
+    for(const auto &entry: scanned_entries) {
+        if(!IsVLogEntryOutdated(entry.key, entry.offset)) {
+            this->put(entry.key, "TODO: 值");
+        }
+    }
+
+    // VLog文件打洞
+
 }
 
 void KVStore::ConvertMemTableToSSTable()
@@ -316,13 +331,20 @@ void KVStore::StoreSSTableToDisk(
     }
 }
 
-std::string KVStore::get_in_level(uint64_t key, int level) {
+std::optional<ss_table::SSTableGetResult> KVStore::GetInLevel (
+    uint64_t key, 
+    int level, 
+    KeyStatus &status
+) const {
+    // 初始化返回值
+    status = KeyStatus::kNotFound; // 默认为未找到状态
+    std::optional<ss_table::SSTableGetResult> result;
+
     std::vector<std::string> ss_table_base_file_name_list;
     utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, level), ss_table_base_file_name_list);
 
     std::unique_ptr<ss_table::SSTable> ss_table;
     uint64_t latest_time_stamp = std::numeric_limits<uint64_t>::min();
-    std::string result;
     for (const auto &ss_table_base_file_name : ss_table_base_file_name_list)
     {
         auto ss_table_file_name = ss_table::SSTable::BuildSSTableFileName(
@@ -350,17 +372,39 @@ std::string KVStore::get_in_level(uint64_t key, int level) {
         auto ss_table_get_res = ss_table->Get(key);
         if (ss_table_get_res.has_value() && ss_table->header().time_stamp > latest_time_stamp)
         {
-            // 找到了一条记录且时间戳更新（找到vlog中的索引或者删除标记）
-            // LOG_INFO("newer key %lu found with time stamp %lu", key, ss_table->header().time_stamp);
-            // LOG_INFO("is deleted: %d", ss_table_get_res.value().vlen == 0);
-            // LOG_INFO("current level is %d", level);
-            result = ss_table_get_res.value().vlen ?
-                this->v_log_->Get(ss_table_get_res.value().offset, ss_table_get_res.value().vlen) : 
-                DELETED;
+            // 找到了一条记录且时间戳更新（找到vlog中的索引或者删除标记），
+            // 更新返回值和状态
+            if(ss_table_get_res.value().vlen) {
+                result = ss_table_get_res.value();
+                status = KeyStatus::kFound;
+            } else {
+                result = std::nullopt;
+                status = KeyStatus::kDeleted;
+            }
             latest_time_stamp = ss_table->header().time_stamp;
         }
     }
+
     return result;
+}
+
+std::string KVStore::GetInLevel(uint64_t key, int level) const {
+    KeyStatus key_status;
+    std::optional<ss_table::SSTableGetResult> optional_offset = GetInLevel(key, level, key_status);
+
+    switch (key_status)
+    {
+    case KeyStatus::kFound:
+        return v_log_->Get(optional_offset->offset, optional_offset->vlen);
+        break;
+    case KeyStatus::kDeleted:
+        return DELETED;
+        break;
+    case KeyStatus::kNotFound:
+    default:
+        return "";
+        break;
+    }
 }
 
 void KVStore::DoCompaction(
@@ -453,6 +497,37 @@ bool KVStore::CheckSSTableLevelOverflow(int level) const {
     }
     utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, level), ss_table_file_name_list);
     return ss_table_file_name_list.size() > ss_table::SSTable::SSTableMaxCountAtLevel(level);
+}
+
+bool KVStore::IsVLogEntryOutdated(uint64_t v_log_entry_key, uint64_t v_log_entry_offset) const {
+    std::string mem_table_get_result = mem_table_->Get(v_log_entry_key);
+        if(!mem_table_get_result.empty()) {
+            // 内存表中查找成功，或者在内存表中找到删除标记
+            return true;
+        }
+
+    // 从SSTable逐层查找
+    int level = 0;
+    KeyStatus key_status;
+    std::optional<ss_table::SSTableGetResult> result;
+    while (utils::dirExists(ss_table::SSTable::BuildSSTableDirName(dir_, level)))
+    {
+        result = GetInLevel(v_log_entry_key, level, key_status);
+        if(key_status == KeyStatus::kDeleted) {
+            // 在SSTable中查找到删除标记
+            return true;
+        }
+        if(key_status == KeyStatus::kFound) {
+            // 查找到有效的值
+            return result->offset != v_log_entry_offset;
+        }
+
+        // 未查找到任何记录，继续查找下一层
+        ++ level;
+    }
+
+    // 没有查找到任何记录
+    return true;
 }
 
 
