@@ -70,7 +70,11 @@ int main(int argc, char* argv[]) {
             uint64_t key;
             std::cin >> key;
             kvstore.get_everywhere(key);
-        } 
+        } else if(command == "gc") {
+            uint64_t chunk_size;
+            std::cin >> chunk_size;
+            kvstore.gc(chunk_size);
+        }
         else {
             std::cout << "Unknown command" << std::endl;
         }
