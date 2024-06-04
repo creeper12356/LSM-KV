@@ -35,6 +35,7 @@ v_log::VLog::VLog(const std::string &v_log_file_name): file_name_(v_log_file_nam
         if(v_log_entry.InspectChecksum()) {
             break;
         }
+        LOG_WARNING("Inspect checksum failed, try next...");
         tail_ += v_log_entry.size();
     }
     
@@ -145,7 +146,7 @@ uint64_t v_log::VLogEntry::ReadFromFile(std::ifstream &fin) {
     while(ch != kMagic) {
         fin.read(&ch, 1);
         if(fin.eof()) {
-            LOG_ERROR("Reach EOF");
+            LOG_ERROR("Reach EOF before reading Magic byte");
             return 0;
         }
         if(!fin) {

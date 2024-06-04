@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <ctime>
 #include <cstring>
-#ifdef ENABLE_LOG
+
 void Logger::info(const char *func, const char *format, ...)
 {
     va_list args;
@@ -39,17 +39,3 @@ void Logger::log(FILE *output,const char *type, const char *func,  const char *f
     fprintf(output, "[%s] %s: %s: ", dt, type, func);
     vfprintf(output, format, args);
 }
-#else 
-void Logger::info(const char *func, const char *format, ...)
-{
-}
-void Logger::error(const char *func, const char *format, ...)
-{
-}
-void Logger::warning(const char *func, const char *format, ...)
-{
-}
-void Logger::log(FILE *output,  const char *type, const char *func, const char *format, va_list args)
-{
-}
-#endif
