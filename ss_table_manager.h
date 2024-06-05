@@ -14,6 +14,9 @@ namespace ss_table {
             const std::vector<KeyOffsetVlenTuple> &inserted_tuples
         );
 
+        void WriteSSTableToFile(const std::shared_ptr<SSTable> &ss_table);
+        void DeleteSSTableFiles(const std::vector<std::string> &file_name_list);
+
     private:
         std::map<std::string, std::shared_ptr<SSTable>> ss_table_read_cache_;
     };

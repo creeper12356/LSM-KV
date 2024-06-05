@@ -29,6 +29,7 @@ KVStore::KVStore(const std::string &dir, const std::string &vlog)
     int level = 0;
     while(std::find(data_dir_entry_list.begin(), data_dir_entry_list.end(), "level-" + std::to_string(level)) != data_dir_entry_list.end()) {
         std::vector<std::string> ss_table_file_name_list;
+        // TODO: 将scanDir移到SSTableManager实现
         utils::scanDir(this->dir_ + "/level-" + std::to_string(level), ss_table_file_name_list);
         for (const auto &ss_table_file_name : ss_table_file_name_list)
         {
@@ -228,7 +229,7 @@ void KVStore::ConvertMemTableToSSTable()
         now,
         inserted_tuples
     );
-    ss_table->WriteToFile();
+    ss_table_manager_->WriteSSTableToFile(ss_table);
 }
 
 
@@ -326,7 +327,7 @@ void KVStore::StoreSSTablesToDisk(
             max_time_stamp, 
             inserted_tuples
         );
-        ss_table->WriteToFile();
+        ss_table_manager_->WriteSSTableToFile(ss_table);
     }
 }
 
@@ -425,9 +426,7 @@ void KVStore::DoCompaction(
         // 此处ss_table-> file_name()为完整路径
         deleted_ss_table_file_name_list.push_back(ss_table->file_name());
     }
-    if(utils::rmfiles(deleted_ss_table_file_name_list) < 0) {
-        LOG_WARNING("Failed to remove old SSTable files");
-    }
+    ss_table_manager_->DeleteSSTableFiles(deleted_ss_table_file_name_list);
 
     // 合并SSTable文件, 并将合并后的SSTable文件写入磁盘
     auto merged_time_stamped_tuple_list = ss_table::SSTable::MergeSSTables(ss_table_list);

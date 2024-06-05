@@ -2,6 +2,7 @@
 #include "utils/logger.h"
 #include "bloom_filter.h"
 #include "inc.h"
+#include "utils.h"
 
 #include <limits>
 
@@ -57,5 +58,22 @@ namespace ss_table {
 
         ss_table_read_cache_[file_name] = new_ss_table;
         return new_ss_table;
+    }
+    
+    void SSTableManager::WriteSSTableToFile(const std::shared_ptr<SSTable> &ss_table)
+    {
+        ss_table->WriteToFile();
+    }
+    
+    void SSTableManager::DeleteSSTableFiles(const std::vector<std::string> &file_name_list)
+    {
+        // 从缓存中删除
+        for(const auto &file_name: file_name_list) {
+            ss_table_read_cache_.erase(file_name);
+        }
+        // 删除磁盘文件
+        if(utils::rmfiles(file_name_list) < 0) {
+            LOG_WARNING("Failed to remove old SSTable files");
+        }
     }
 }
