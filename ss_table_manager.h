@@ -15,7 +15,7 @@ namespace ss_table {
         );
 
     private:
-        std::map<std::string, std::shared_ptr<SSTable>> ss_table_cache_;
+        std::map<std::string, std::shared_ptr<SSTable>> ss_table_read_cache_;
     };
 }
 

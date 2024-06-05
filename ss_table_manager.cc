@@ -8,9 +8,9 @@
 namespace ss_table {
     std::shared_ptr<SSTable> SSTableManager::FromFile(const std::string &file_name)
     {
-        if(ss_table_cache_.find(file_name) != ss_table_cache_.end()) {
+        if(ss_table_read_cache_.find(file_name) != ss_table_read_cache_.end()) {
             // LOG_INFO("Cache hit for SSTable file `%s`", file_name.c_str());
-            return ss_table_cache_[file_name];
+            return ss_table_read_cache_[file_name];
         }
 
         std::ifstream fin;
@@ -33,7 +33,7 @@ namespace ss_table {
         fin.close();
         new_ss_table.get()->file_name_ = file_name;
 
-        ss_table_cache_[file_name] = new_ss_table;
+        ss_table_read_cache_[file_name] = new_ss_table;
         return new_ss_table;
     }
     
@@ -55,7 +55,7 @@ namespace ss_table {
         new_ss_table.get()->header_ = {time_stamp, inserted_tuples.size(), min_key, max_key};
         new_ss_table.get()->file_name_ = file_name;
 
-        ss_table_cache_[file_name] = new_ss_table;
+        ss_table_read_cache_[file_name] = new_ss_table;
         return new_ss_table;
     }
 }
