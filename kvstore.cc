@@ -144,6 +144,8 @@ void KVStore::reset()
 {
     // 清空内存表
     mem_table_->Reset();
+    // 清空SSTableManager缓存
+    ss_table_manager_->ResetCache();
 
     // 删除所有SSTable文件及其目录
     int level = 0;

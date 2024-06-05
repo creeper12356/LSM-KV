@@ -16,7 +16,7 @@ namespace ss_table {
 
         void WriteSSTableToFile(const std::shared_ptr<SSTable> &ss_table);
         void DeleteSSTableFiles(const std::vector<std::string> &file_name_list);
-
+        void ResetCache();
     private:
         std::map<std::string, std::shared_ptr<SSTable>> ss_table_read_cache_;
     };

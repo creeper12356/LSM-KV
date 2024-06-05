@@ -76,4 +76,9 @@ namespace ss_table {
             LOG_WARNING("Failed to remove old SSTable files");
         }
     }
+    
+    void SSTableManager::ResetCache()
+    {
+        ss_table_read_cache_.clear();
+    }
 }
