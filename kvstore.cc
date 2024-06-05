@@ -5,6 +5,7 @@
 #include "v_log.h"
 #include "utils.h"
 #include "inc.h"
+#include "ss_table_manager.h"
 #include "utils/logger.h"
 
 #include <iostream>
@@ -43,6 +44,7 @@ KVStore::KVStore(const std::string &dir, const std::string &vlog)
 
     mem_table_ = new skip_list::SkipList;
     v_log_ = new v_log::VLog(vlog);
+    ss_table_manager_ = std::make_unique<ss_table::SSTableManager>();
 
 }
 
@@ -217,7 +219,7 @@ void KVStore::ConvertMemTableToSSTable()
 
     // 将SSTable写入文件
     uint64_t now = std::chrono::system_clock::now().time_since_epoch().count();
-    auto ss_table = ss_table::SSTable::NewSSTable(
+    auto ss_table = ss_table_manager_->NewSSTable(
         ss_table::SSTable::BuildSSTableFileName(
             dir_, 
             0, 
@@ -233,7 +235,7 @@ void KVStore::ConvertMemTableToSSTable()
 void KVStore::LoadSSTablesToMemory(
     const std::vector<std::string> &ss_table_file_name_list, 
     int level,
-    std::vector<std::unique_ptr<ss_table::SSTable>> &ss_table_list,
+    std::vector<std::shared_ptr<ss_table::SSTable>> &ss_table_list,
     uint64_t &min_key,
     uint64_t &max_key
 ) {
@@ -242,7 +244,7 @@ void KVStore::LoadSSTablesToMemory(
 
     for(const auto &ss_table_file_name: ss_table_file_name_list) {
         auto ss_table = 
-            ss_table::SSTable::FromFile(ss_table::SSTable::BuildSSTableFileName(
+            ss_table_manager_->FromFile(ss_table::SSTable::BuildSSTableFileName(
                 dir_, 
                 level,
                 ss_table_file_name
@@ -253,7 +255,7 @@ void KVStore::LoadSSTablesToMemory(
         }
         min_key = ss_table->header().min_key < min_key ? ss_table->header().min_key : min_key;
         max_key = ss_table->header().max_key > max_key ? ss_table->header().max_key : max_key;
-        ss_table_list.push_back(std::move(ss_table));
+        ss_table_list.push_back(ss_table);
     }
 }
 
@@ -261,7 +263,7 @@ void KVStore::LoadSSTablesInRangeToMemory(
     int level,
     uint64_t min_key, 
     uint64_t max_key,
-    std::vector<std::unique_ptr<ss_table::SSTable>> &ss_table_list
+    std::vector<std::shared_ptr<ss_table::SSTable>> &ss_table_list
 ) {
     std::string ss_table_dir_name = ss_table::SSTable::BuildSSTableDirName(dir_, level);
     if(!utils::dirExists(ss_table_dir_name)) {
@@ -272,7 +274,7 @@ void KVStore::LoadSSTablesInRangeToMemory(
     utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, level), ss_table_file_name_list);
     for(const auto &ss_table_file_name: ss_table_file_name_list) {
         auto ss_table = 
-            ss_table::SSTable::FromFile(ss_table::SSTable::BuildSSTableFileName(dir_, level, ss_table_file_name));
+            ss_table_manager_->FromFile(ss_table::SSTable::BuildSSTableFileName(dir_, level, ss_table_file_name));
         if(!ss_table) {
             continue;
         }
@@ -281,7 +283,7 @@ void KVStore::LoadSSTablesInRangeToMemory(
             continue;
         }
 
-        ss_table_list.push_back(std::move(ss_table));
+        ss_table_list.push_back(ss_table);
     }
 }
 
@@ -316,7 +318,7 @@ void KVStore::StoreSSTablesToDisk(
         }
         
         // 将SSTable写入文件
-        auto ss_table = ss_table::SSTable::NewSSTable(
+        auto ss_table = ss_table_manager_->NewSSTable(
             ss_table::SSTable::BuildUniqueSSTableFileName(
                 dir_,
                 level
@@ -340,7 +342,7 @@ std::optional<ss_table::SSTableGetResult> KVStore::GetInSSTable (
     std::vector<std::string> ss_table_base_file_name_list;
     utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, level), ss_table_base_file_name_list);
 
-    std::unique_ptr<ss_table::SSTable> ss_table;
+    std::shared_ptr<ss_table::SSTable> ss_table;
     uint64_t latest_time_stamp = std::numeric_limits<uint64_t>::min();
     for (const auto &ss_table_base_file_name : ss_table_base_file_name_list)
     {
@@ -360,7 +362,7 @@ std::optional<ss_table::SSTableGetResult> KVStore::GetInSSTable (
         }
 
         // 将整个SSTable文件读入内存
-        ss_table = ss_table::SSTable::FromFile(ss_table_file_name);
+        ss_table = ss_table_manager_->FromFile(ss_table_file_name);
         if(!ss_table) {
             // 读取SSTable文件失败
             continue;
@@ -410,7 +412,7 @@ void KVStore::DoCompaction(
     int to_level
 ) {
     // 将SSTable文件读入内存
-    std::vector<std::unique_ptr<ss_table::SSTable>>ss_table_list;
+    std::vector<std::shared_ptr<ss_table::SSTable>>ss_table_list;
     uint64_t min_key = std::numeric_limits<uint64_t>::max(), 
                 max_key = std::numeric_limits<uint64_t>::min();
     LoadSSTablesToMemory(ss_table_base_file_name_list, from_level,
@@ -551,7 +553,7 @@ void KVStore::get_everywhere_in_level(uint64_t key, int level) {
     std::vector<std::string> ss_table_base_file_name_list;
     utils::scanDir(ss_table::SSTable::BuildSSTableDirName(dir_, level), ss_table_base_file_name_list);
 
-    std::unique_ptr<ss_table::SSTable> ss_table;
+    std::shared_ptr<ss_table::SSTable> ss_table;
     for (const auto &ss_table_base_file_name : ss_table_base_file_name_list)
     {
         auto ss_table_file_name = ss_table::SSTable::BuildSSTableFileName(
@@ -570,7 +572,7 @@ void KVStore::get_everywhere_in_level(uint64_t key, int level) {
         }
 
         // 将整个SSTable文件读入内存
-        ss_table = ss_table::SSTable::FromFile(ss_table_file_name);
+        ss_table = ss_table_manager_->FromFile(ss_table_file_name);
         if(!ss_table) {
             // 读取SSTable文件失败
             continue;

@@ -70,24 +70,11 @@ namespace ss_table
     };
     class SSTable
     {
+        friend class SSTableManager;
     public:
-        /**
-         * @brief 从SSTable文件生成缓存
-         * 
-         * @param file_name 
-         * @return std::unique_ptr<SSTable> 
-         */
-        static std::unique_ptr<SSTable> FromFile(const std::string &file_name);
-
-        /**
-         * @brief 创建新的SSTable缓存
-         * 
-         * @param file_name
-         * @param time_stamp 
-         * @param inserted_tuples 
-         * @return std::unique_ptr<SSTable> 
-         */
-        static std::unique_ptr<SSTable> NewSSTable(const std::string &file_name, uint64_t time_stamp, const std::vector<KeyOffsetVlenTuple> &inserted_tuples);
+        static std::shared_ptr<SSTable> create() {
+            return std::shared_ptr<SSTable>(new SSTable());
+        }
     
     private:
         SSTable() = default;
@@ -152,7 +139,7 @@ namespace ss_table
         std::optional<SSTableGetResult> Get(uint64_t key) const;
 
 
-        static std::vector<TimeStampedKeyOffsetVlenTuple> MergeSSTables(const std::vector<std::unique_ptr<SSTable>> &ss_table_list);
+        static std::vector<TimeStampedKeyOffsetVlenTuple> MergeSSTables(const std::vector<std::shared_ptr<SSTable>> &ss_table_list);
         
         /**
          * @brief 直接读取SSTable文件的Header部分

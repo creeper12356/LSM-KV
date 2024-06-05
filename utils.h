@@ -178,9 +178,9 @@ namespace utils
      * util function used by crc16, you needn't call this function yourself
      */
 #define POLYNOMIAL 0x1021
-    static inline std::unique_ptr<uint16_t[]> generate_crc16_table()
+    static inline std::shared_ptr<uint16_t[]> generate_crc16_table()
     {
-        std::unique_ptr<uint16_t[]> table(new uint16_t[256]{0});
+        std::shared_ptr<uint16_t[]> table(new uint16_t[256]{0});
         for (int i = 0; i < 256; i++)
         {
             uint16_t value = 0;
@@ -209,7 +209,7 @@ namespace utils
      */
     static inline uint16_t crc16(const std::vector<unsigned char> &data)
     {
-        static const std::unique_ptr<uint16_t[]> crc16_table = generate_crc16_table();
+        static const std::shared_ptr<uint16_t[]> crc16_table = generate_crc16_table();
         uint16_t crc = 0xFFFF;
         size_t i = 0, length = data.size();
         while (i < length)

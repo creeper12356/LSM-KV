@@ -5,14 +5,14 @@ CC = g++
 
 all: correctness persistence my_correctness
 
-correctness: kvstore.o correctness.o skip_list.o bloom_filter.o ss_table.o v_log.o logger.o
+correctness: kvstore.o correctness.o skip_list.o bloom_filter.o ss_table.o ss_table_manager.o v_log.o logger.o
 
-persistence: kvstore.o persistence.o skip_list.o bloom_filter.o ss_table.o v_log.o logger.o
+persistence: kvstore.o persistence.o skip_list.o bloom_filter.o ss_table.o ss_table_manager.o v_log.o logger.o
 
-my_correctness: kvstore.o my_correctness.o skip_list.o bloom_filter.o ss_table.o v_log.o logger.o
+my_correctness: kvstore.o my_correctness.o skip_list.o bloom_filter.o ss_table.o ss_table_manager.o v_log.o logger.o
 
-driver_test: driver.o kvstore.o skip_list.o bloom_filter.o ss_table.o v_log.o logger.o
-	$(LINK.o) -o driver_test driver.o kvstore.o skip_list.o bloom_filter.o ss_table.o v_log.o logger.o
+driver_test: driver.o kvstore.o skip_list.o bloom_filter.o ss_table.o ss_table_manager.o v_log.o logger.o
+	$(LINK.o) -o driver_test driver.o kvstore.o skip_list.o bloom_filter.o ss_table.o ss_table_manager.o v_log.o logger.o
 	
 driver: driver_test
 	./driver_test data data/vlog

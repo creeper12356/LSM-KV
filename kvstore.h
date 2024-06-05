@@ -19,6 +19,7 @@ namespace v_log
 namespace ss_table
 {
 	class SSTable;
+	class SSTableManager;
 	struct TimeStampedKeyOffsetVlenTuple;
 	struct SSTableGetResult;
 }
@@ -105,7 +106,7 @@ private:
 	void LoadSSTablesToMemory(
 		const std::vector<std::string> &ss_table_file_name_list, 
 		int level,
-		std::vector<std::unique_ptr<ss_table::SSTable>> &ss_table_list,
+		std::vector<std::shared_ptr<ss_table::SSTable>> &ss_table_list,
 		uint64_t &min_key,
 		uint64_t &max_key
 	);
@@ -122,7 +123,7 @@ private:
 		int level,
 		uint64_t min_key, 
 		uint64_t max_key,
-		std::vector<std::unique_ptr<ss_table::SSTable>> &ss_table_list
+		std::vector<std::shared_ptr<ss_table::SSTable>> &ss_table_list
 	);
 
 	/**
@@ -203,6 +204,7 @@ private:
 	std::string dir_;
 	skip_list::SkipList *mem_table_;
 	v_log::VLog *v_log_;
+	std::unique_ptr<ss_table::SSTableManager> ss_table_manager_;
 
 // --------------------------------------
 // For Test Only
