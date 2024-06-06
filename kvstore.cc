@@ -16,6 +16,8 @@
 #include <algorithm>
 #include <chrono>
 #include <optional>
+#include <queue>
+#include <set>
 
 KVStore::KVStore(const std::string &dir, const std::string &vlog)
     : KVStoreAPI(dir, vlog), dir_(dir)
@@ -174,15 +176,85 @@ void KVStore::reset()
  */
 void KVStore::scan(uint64_t key1, uint64_t key2, std::list<std::pair<uint64_t, std::string>> &list)
 {
-    //    mem_table_->Scan(key1, key2, list);
-    // naive 实现
-    for (auto i = key1; i <= key2; ++i)
+    std::list<std::pair<uint64_t, std::string>> mem_table_list;
+    mem_table_->Scan(key1, key2, mem_table_list);
+
+    // 从SSTable逐层查找
+    // TODO: copied from other functions, refactor it
+
+    int level = 0;
+    std::vector<std::shared_ptr<ss_table::SSTable>> ss_table_list;
+    // 从level-0开始扫描SSTable文件，将所有与[key1, key2]有交集的SSTable文件读入内存
+    while (utils::dirExists(ss_table::SSTable::BuildSSTableDirName(dir_, level)))
     {
-        auto get_result = get(i);
-        if (!get_result.empty())
+        LoadSSTablesInRangeToMemory(level, key1, key2, ss_table_list);
+        ++ level;
+    }
+
+    // 将所有SSTable的索引打上时间戳、SSTable索引，放入优先队列
+    auto cmp = [](const ss_table::TimeStampedKeyOffsetVlenTuple &a, const ss_table::TimeStampedKeyOffsetVlenTuple &b) {
+        return a.key_offset_vlen_tuple.key > b.key_offset_vlen_tuple.key 
+            || (a.key_offset_vlen_tuple.key == b.key_offset_vlen_tuple.key && a.time_stamp > b.time_stamp)
+            || (a.key_offset_vlen_tuple.key == b.key_offset_vlen_tuple.key && a.time_stamp == b.time_stamp && a.ss_table_index < b.ss_table_index);
+    };
+    std::priority_queue<
+        ss_table::TimeStampedKeyOffsetVlenTuple,
+        std::vector<ss_table::TimeStampedKeyOffsetVlenTuple>,
+        decltype(cmp)
+    > pq(cmp);
+    size_t ss_table_index = 0;
+    for (const auto &ss_table : ss_table_list)
+    {
+        for (const auto &tuple : ss_table->key_offset_vlen_tuple_list())
         {
-            list.emplace_back(i, get_result);
+            if(tuple.key >= key1 && tuple.key <= key2) {
+                pq.emplace(ss_table->header().time_stamp, tuple, ss_table_index);
+            }
         }
+        ++ ss_table_index;
+    }
+
+    // 使用优先级队列进行合并
+    std::vector<ss_table::TimeStampedKeyOffsetVlenTuple> merged_results;
+    while (!pq.empty()) {
+        auto current = pq.top();
+        pq.pop();
+
+        // 取出key相同的元组中，优先级最低的元组
+        while (!pq.empty() && pq.top().key_offset_vlen_tuple.key == current.key_offset_vlen_tuple.key) {
+            current = pq.top();
+            pq.pop();
+        }
+
+        merged_results.push_back(current);
+    }
+
+    // 将内存表扫描结果与SSTable扫描结果合并
+    std::set<uint64_t> scanned_mem_table_keys;
+    for(const auto &mem_table_pair: mem_table_list) {
+        scanned_mem_table_keys.insert(mem_table_pair.first);
+        if(mem_table_pair.second != DELETED) {
+            // 在内存表中找到有效值
+            scanned_mem_table_keys.insert(mem_table_pair.first);
+            list.push_back(mem_table_pair);
+        }
+    }
+
+    for(const auto &time_stamped_tuple: merged_results) {
+        if(
+            std::find(scanned_mem_table_keys.begin(),
+            scanned_mem_table_keys.end(),
+            time_stamped_tuple.key_offset_vlen_tuple.key) != scanned_mem_table_keys.end()
+        ) {
+            // 内存表中已经存在该键（有效值或者删除标记）
+                continue;
+        }
+        if(!time_stamped_tuple.key_offset_vlen_tuple.vlen) {
+            // 在SSTable中找到删除标记
+            continue;
+        }
+        list.push_back(std::make_pair(time_stamped_tuple.key_offset_vlen_tuple.key, 
+            v_log_->Get(time_stamped_tuple.key_offset_vlen_tuple.offset, time_stamped_tuple.key_offset_vlen_tuple.vlen)));
     }
 }
 

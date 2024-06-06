@@ -1,1 +1,10 @@
 .DS_Store
+*.o
+data/*
+correctness
+persistence
+performance
+my_correctness
+driver_test
+.vscode
+
