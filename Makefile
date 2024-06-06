@@ -3,13 +3,15 @@ LINK.o = $(LINK.cc)
 CXXFLAGS = -std=c++20 -Wall -g -Ofast -march=native -mtune=native -fopenmp
 CC = g++
 
-all: correctness persistence my_correctness
+all: correctness persistence my_correctness performance driver_test
 
 correctness: kvstore.o correctness.o skip_list.o bloom_filter.o ss_table.o ss_table_manager.o v_log.o logger.o
 
 persistence: kvstore.o persistence.o skip_list.o bloom_filter.o ss_table.o ss_table_manager.o v_log.o logger.o
 
 my_correctness: kvstore.o my_correctness.o skip_list.o bloom_filter.o ss_table.o ss_table_manager.o v_log.o logger.o
+
+performance: performance.o kvstore.o skip_list.o bloom_filter.o ss_table.o ss_table_manager.o v_log.o logger.o
 
 driver_test: driver.o kvstore.o skip_list.o bloom_filter.o ss_table.o ss_table_manager.o v_log.o logger.o
 	$(LINK.o) -o driver_test driver.o kvstore.o skip_list.o bloom_filter.o ss_table.o ss_table_manager.o v_log.o logger.o
@@ -22,6 +24,9 @@ logger.o: utils/logger.cc utils/logger.h
 
 driver.o: driver/driver.cc
 	$(CC) $(CXXFLAGS) -c driver/driver.cc 
+
+performance.o: test/performance.cc
+	$(CC) $(CXXFLAGS) -c test/performance.cc
 
 clean:
 	-rm -f correctness persistence my_correctness driver_test *.o
