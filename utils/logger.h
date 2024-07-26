@@ -1,7 +1,6 @@
 #include <cstdio>
 #ifndef LOGGER_H
 #define LOGGER_H
-// #define ENABLE_LOG
 /**
  * @brief 简易日志接口
  * 

@@ -1,32 +1,28 @@
-
 LINK.o = $(LINK.cc)
 CXXFLAGS = -std=c++20 -Wall -g -Ofast -march=native -mtune=native -fopenmp
+ifeq ($(ENABLE_LOG), 1)
+	CXXFLAGS += -DENABLE_LOG
+endif
 CC = g++
 
-all: correctness persistence my_correctness performance driver_test
+OBJS = kvstore.o skip_list.o bloom_filter.o ss_table.o ss_table_manager.o v_log.o logger.o
 
-correctness: kvstore.o correctness.o skip_list.o bloom_filter.o ss_table.o ss_table_manager.o v_log.o logger.o
+all: correctness persistence performance
 
-persistence: kvstore.o persistence.o skip_list.o bloom_filter.o ss_table.o ss_table_manager.o v_log.o logger.o
+correctness: $(OBJS) correctness.o
+persistence: $(OBJS) persistence.o
+my_correctness: $(OBJS) my_correctness.o
+performance: $(OBJS) performance.o
 
-my_correctness: kvstore.o my_correctness.o skip_list.o bloom_filter.o ss_table.o ss_table_manager.o v_log.o logger.o
+%.o: %.cc %.h
+	$(CC) $(CXXFLAGS) -c $<
 
-performance: performance.o kvstore.o skip_list.o bloom_filter.o ss_table.o ss_table_manager.o v_log.o logger.o
-
-driver_test: driver.o kvstore.o skip_list.o bloom_filter.o ss_table.o ss_table_manager.o v_log.o logger.o
-	$(LINK.o) -o driver_test driver.o kvstore.o skip_list.o bloom_filter.o ss_table.o ss_table_manager.o v_log.o logger.o
-	
-driver: driver_test
-	./driver_test data data/vlog
-
-logger.o: utils/logger.cc utils/logger.h 
-	$(CC) $(CXXFLAGS) -c utils/logger.cc 
-
-driver.o: driver/driver.cc
-	$(CC) $(CXXFLAGS) -c driver/driver.cc 
+logger.o: utils/logger.cc utils/logger.h
+	$(CC) $(CXXFLAGS) -c $<
 
 performance.o: test/performance.cc
-	$(CC) $(CXXFLAGS) -c test/performance.cc
+	$(CC) $(CXXFLAGS) -c $<
+
 
 clean:
-	-rm -f correctness persistence my_correctness driver_test *.o
+	-rm -f correctness persistence performance *.o

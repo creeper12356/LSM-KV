@@ -12,7 +12,6 @@
 #include <chrono>
 #include <string>
 #include <list>
-#define ENABLE_LOG
 #include "../utils/logger.h"
 #include "../kvstore.h"
 using namespace std::chrono;
