@@ -1,34 +1,33 @@
-## Project LSM-KV: KVStore using Log-structured Merge Tree
+# Project LSM-KV: 键值分离存储系统
+> creeper12356
+### 简介
+本项目为课程SE2322高级数据结构的Project，使用C++实现一个键值分离存储系统，最终分数100/100。
+### 编译和运行
+注：本项目必须在**Linux**操作系统上编译和运行。
+#### 编译
+本项目使用日志输出以便于快速Debug，可以在编译时指定是否开启日志。
 
-
-The handout files include two main parts:
-
-- The `KVStoreAPI` class in `kvstore_api.h` that specifies the interface of KVStore.
-- Test files including correctness test (`correctness.cc`) and persistence test (`persistence.cc`).
-
-Explanation of each handout file:
-
-```text
-.
-├── Makefile  // Makefile if you use GNU Make
-├── README.md // This readme file
-├── correctness.cc // Correctness test, you should not modify this file
-├── data      // Data directory used in our test
-├── kvstore.cc     // your implementation
-├── kvstore.h      // your implementation
-├── kvstore_api.h  // KVStoreAPI, you should not modify this file
-├── persistence.cc // Persistence test, you should not modify this file
-├── utils.h         // Provides some file/directory interface
-├── MurmurHash3.h  // Provides murmur3 hash function
-└── test.h         // Base class for testing, you should not modify this file
+关闭日志编译：
+```sh
+make
+```
+开启日志编译：
+```sh
+make ENABLE_LOG=1
+```
+#### 运行
+编译成功后，可以运行各项测试。
+运行正确性测试：
+```sh
+./correctness -v
+```
+运行持久性测试：
+```sh
+./persistence -v
+```
+运行性能测试：
+```
+./performance
 ```
 
-
-First have a look at the `kvstore_api.h` file to check functions you need to implement. Then modify the `kvstore.cc` and `kvstore.h` files and feel free to add new class files.
-
-We will use all files with `.cc`, `.cpp`, `.cxx` suffixes to build correctness and persistence tests. Thus, you can use any IDE to finish this project as long as you ensure that all C++ source files are submitted.
-
-For the test files, of course you could modify it to debug your programs. But remember to change it back when you are testing.
-
-Good luck :)
-
+Enjoy coding! 😀
